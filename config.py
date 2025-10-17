@@ -92,6 +92,15 @@ if CUSTOM_SCRIPT:
         logger.warn(f"CUSTOM_SCRIPT {CUSTOM_SCRIPT} is not executable")
         CUSTOM_SCRIPT = ""
 
+CUSTOM_SCRIPT_AFTER_MOVING = env._CUSTOM_SCRIPT_AFTER_MOVING
+if CUSTOM_SCRIPT_AFTER_MOVING:
+    if not os.path.exists(CUSTOM_SCRIPT_AFTER_MOVING):
+        logger.warn(f"CUSTOM_SCRIPT_AFTER_MOVING {CUSTOM_SCRIPT_AFTER_MOVING} does not exist")
+        CUSTOM_SCRIPT_AFTER_MOVING = ""
+    elif not os.access(CUSTOM_SCRIPT_AFTER_MOVING, os.X_OK):
+        logger.warn(f"CUSTOM_SCRIPT_AFTER_MOVING {CUSTOM_SCRIPT_AFTER_MOVING} is not executable")
+        CUSTOM_SCRIPT_AFTER_MOVING = ""
+
 # Debugging settings
 if not env.USING_EXTERNAL_BYPASSER:
     # Virtual display settings for debugging internal cloudflare bypasser

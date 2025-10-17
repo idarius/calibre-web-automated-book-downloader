@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from threading import Event
 
 from logger import setup_logger
-from config import CUSTOM_SCRIPT
+from config import CUSTOM_SCRIPT, CUSTOM_SCRIPT_AFTER_MOVING
 from env import INGEST_DIR, TMP_DIR, MAIN_LOOP_SLEEP_TIME, USE_BOOK_TITLE, MAX_CONCURRENT_DOWNLOADS, DOWNLOAD_PROGRESS_UPDATE_INTERVAL
 from models import book_queue, BookInfo, QueueStatus, SearchFilters
 import book_manager
@@ -203,7 +203,12 @@ def _download_book_with_cancellation(book_id: str, cancel_flag: Event) -> Option
                 
             os.rename(intermediate_path, final_path)
             logger.info(f"Download completed successfully: {book_info.title}")
-            
+
+            # Execute custom script after moving the file
+            if CUSTOM_SCRIPT_AFTER_MOVING:
+                logger.info(f"Running custom script after moving: {CUSTOM_SCRIPT_AFTER_MOVING}")
+                subprocess.run([CUSTOM_SCRIPT_AFTER_MOVING, final_path])
+                        
         return str(final_path)
     except Exception as e:
         if cancel_flag.is_set():

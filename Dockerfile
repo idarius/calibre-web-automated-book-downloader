@@ -42,6 +42,12 @@ RUN apt-get update && \
     dumb-init \
     # For debug
     zip iputils-ping \
+    # For MQTT publishing
+    mosquitto-clients \
+    # For SQLite database access
+    sqlite3 \
+    # For JSON processing
+    jq \
     # For user switching
     sudo && \
     # Cleanup APT cache *after* all installs in this layer
