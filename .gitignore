@@ -1,6 +1,7 @@
 # Created by https://www.toptal.com/developers/gitignore/api/macos,visualstudiocode,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=macos,visualstudiocode,python
 
+
 ### macOS ###
 # General
 .DS_Store
@@ -87,6 +88,9 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+
+# Roo
+.roo/
 
 # Translations
 *.mo
