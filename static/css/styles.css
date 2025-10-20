@@ -37,6 +37,27 @@
     --input-background: #2d2d2d;
 }
 
+[data-theme="dark-blue"] {
+    /* Dark Blue theme with gradient background */
+    --text-color: #ffffff;
+    --background-color: #0a192f;
+    --border-color: #1e3a5f;
+    --header-bg: #0d1b2a;
+    --header-text: #ffffff;
+    --loading-overlay: rgba(0, 0, 0, 0.7);
+    --card-background: rgba(15, 30, 55, 0.8);
+    --table-background: rgba(15, 30, 55, 0.9);
+    --table-hover-background: rgba(30, 50, 80, 0.9);
+    --table-border-color: #1e3a5f;
+    --input-background: rgba(20, 40, 70, 0.8);
+    --heading-color: #ffffff;
+    
+    /* Gradient backgrounds */
+    --bg-gradient-start: #0a192f;
+    --bg-gradient-mid: #0d1b2a;
+    --bg-gradient-end: #000000;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -548,4 +569,94 @@ h1, h2, h3, h4, h5, h6,
 /* Ensure search results heading is visible */
 #results-section-accordion .uk-accordion-title h1 {
     color: var(--heading-color) !important;
+}
+
+/* Dark Blue theme specific styles */
+[data-theme="dark-blue"] body {
+    background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-mid) 50%, var(--bg-gradient-end) 100%);
+    background-attachment: fixed;
+}
+
+[data-theme="dark-blue"] main {
+    background: transparent;
+}
+
+/* Glassmorphism effects for dark blue theme */
+[data-theme="dark-blue"] .details-container {
+    background: var(--card-background);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark-blue"] article.rounded.border.p-3.flex.flex-col.gap-3 {
+    background: var(--card-background) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+    transition: all 0.3s ease !important;
+}
+
+[data-theme="dark-blue"] article.rounded.border.p-3.flex.flex-col.gap-3:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+[data-theme="dark-blue"] .p-3.rounded.border.flex.flex-col.gap-2 {
+    background: var(--card-background) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+}
+
+[data-theme="dark-blue"] input,
+[data-theme="dark-blue"] select {
+    border-radius: 8px !important;
+    background: var(--input-background) !important;
+    backdrop-filter: blur(5px) !important;
+    -webkit-backdrop-filter: blur(5px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    transition: all 0.3s ease !important;
+}
+
+[data-theme="dark-blue"] input:focus,
+[data-theme="dark-blue"] select:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.2) !important;
+    outline: none !important;
+}
+
+[data-theme="dark-blue"] button {
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+}
+
+[data-theme="dark-blue"] button:hover {
+    transform: translateY(-1px) !important;
+}
+
+[data-theme="dark-blue"] .modal-overlay {
+    background: rgba(0, 0, 0, 0.8) !important;
+    backdrop-filter: blur(5px) !important;
+    -webkit-backdrop-filter: blur(5px) !important;
+}
+
+[data-theme="dark-blue"] header {
+    background: var(--header-bg) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="dark-blue"] footer {
+    background: var(--header-bg) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
