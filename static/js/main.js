@@ -750,8 +750,10 @@
       // Don't start automatic fetching to reduce unnecessary requests
       // this.fetchStatus(false);
       
-      // Ensure sidebar shows valid state after initialization
-      this.ensureValidState();
+      // Initialize with clean state instead of calling ensureValidState
+      if (el.sidebarStatusList) {
+        el.sidebarStatusList.innerHTML = '<div class="text-sm opacity-80">No downloads.</div>';
+      }
     },
     
     toggle() {
