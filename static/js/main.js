@@ -57,7 +57,7 @@
     activeDownloads: '/request/api/downloads/active'
   };
   const FILTERS = ['isbn', 'author', 'title', 'lang', 'sort', 'content', 'format'];
-  const SIDEBAR_REFRESH_INTERVAL = 3000; // 3 seconds for faster updates
+  const SIDEBAR_REFRESH_INTERVAL = 10000; // 10 seconds to reduce server load
   const SIDEBAR_INACTIVITY_TIMEOUT = 30000; // 30 seconds
   
   // ---- API Cache ----
@@ -66,11 +66,13 @@
     activeDownloads: null,
     lastStatusFetch: 0,
     lastActiveFetch: 0,
-    ttl: 2000, // 2 seconds cache TTL
+    ttl: 8000, // 8 seconds cache TTL for better efficiency
     
     isValid(endpoint) {
       const now = Date.now();
       if (endpoint === 'status') {
+        // Cache de 8 secondes pour éviter les requêtes multiples
+        // mais permettre le rafraîchissement toutes les 10s
         return this.status !== null && (now - this.lastStatusFetch) < this.ttl;
       } else if (endpoint === 'activeDownloads') {
         return this.activeDownloads !== null && (now - this.lastActiveFetch) < this.ttl;
@@ -379,7 +381,18 @@
     async fetch() {
       try {
         utils.show(el.statusLoading);
-        const data = await utils.j(API.status);
+        
+        // Use cache to avoid redundant requests
+        let data;
+        if (apiCache.isValid('status')) {
+          data = apiCache.get('status');
+          console.log('Status: using cached data');
+        } else {
+          data = await utils.j(API.status);
+          apiCache.set('status', data);
+          console.log('Status: fetched fresh data');
+        }
+        
         this.render(data);
         // Also reflect active downloads in the top section
         this.renderTop(data);
@@ -589,8 +602,9 @@
         }
       });
       
-      // Initial status fetch without loader (background)
-      this.fetchStatus(false);
+      // Initial status fetch without loader (background) - only if sidebar will be used
+      // Don't start automatic fetching to reduce unnecessary requests
+      // this.fetchStatus(false);
       
       // Ensure sidebar shows valid state after initialization
       this.ensureValidState();
@@ -633,9 +647,12 @@
     startAutoRefresh() {
       this.stopAutoRefresh(); // Clear any existing timer
       this.refreshTimer = setInterval(() => {
-        // Only refresh if sidebar is open and tab is visible
+        // Continuer à rafraîchir toutes les 10s si sidebar ouvert ET visible
         if (this.isOpen && this.isVisible) {
           this.fetchStatus(false); // No loader for auto-refresh
+        } else {
+          // Arrêter uniquement si sidebar fermé OU onglet non visible
+          this.stopAutoRefresh();
         }
       }, SIDEBAR_REFRESH_INTERVAL);
     },
@@ -983,19 +1000,34 @@
     updateBadge() {
       if (!el.sidebarBadge) return;
       
-      // Count ONLY real items (exclude optimistic items to avoid double counting)
-      const realItems = Array.from(el.sidebarStatusList?.querySelectorAll('li') || [])
-        .filter(li => !li.hasAttribute('data-optimistic-id') &&
-          (li.textContent.includes('downloading') || li.textContent.includes('queued')));
+      // Get all real items in the DOM
+      const allRealItems = Array.from(el.sidebarStatusList?.querySelectorAll('li') || [])
+        .filter(li => !li.hasAttribute('data-optimistic-id'));
       
-      // Add optimistic items to the count (they're not in the DOM yet)
-      const totalCount = realItems.length + this.optimisticItems.size;
+      // Get IDs of real items to avoid double counting during transition
+      const realItemIds = new Set();
+      allRealItems.forEach(li => {
+        const cancelBtn = li.querySelector('[data-cancel]');
+        if (cancelBtn) {
+          realItemIds.add(cancelBtn.getAttribute('data-cancel'));
+        }
+      });
       
-      const hasError = Array.from(el.sidebarStatusList?.querySelectorAll('li') || [])
-        .some(li => !li.hasAttribute('data-optimistic-id') && li.textContent.includes('error'));
+      // Count real items (queued + downloading)
+      const realItems = allRealItems.filter(li =>
+        li.textContent.includes('downloading') || li.textContent.includes('queued')
+      );
       
-      const hasDownloading = Array.from(el.sidebarStatusList?.querySelectorAll('li') || [])
-        .some(li => !li.hasAttribute('data-optimistic-id') && li.textContent.includes('downloading'));
+      // Add ONLY optimistic items that don't have a real counterpart yet
+      // This prevents double counting during queue→downloading transition
+      const optimisticItemsWithoutReal = Array.from(this.optimisticItems).filter(id =>
+        !realItemIds.has(id)
+      );
+      
+      const totalCount = realItems.length + optimisticItemsWithoutReal.length;
+      
+      const hasError = allRealItems.some(li => li.textContent.includes('error'));
+      const hasDownloading = allRealItems.some(li => li.textContent.includes('downloading'));
       
       if (totalCount > 0) {
         el.sidebarBadge.textContent = totalCount;
@@ -1005,7 +1037,7 @@
         el.sidebarBadge.classList.remove('sidebar-badge-error', 'sidebar-badge-downloading');
         if (hasError) {
           el.sidebarBadge.classList.add('sidebar-badge-error');
-        } else if (hasDownloading || this.optimisticItems.size > 0) {
+        } else if (hasDownloading || optimisticItemsWithoutReal.length > 0) {
           el.sidebarBadge.classList.add('sidebar-badge-downloading', 'sidebar-badge-pulse');
         }
       } else {
@@ -1189,7 +1221,9 @@
     }
 
     el.refreshStatusBtn?.addEventListener('click', () => {
-      status.fetch();
+      // Don't fetch status automatically on page load to reduce unnecessary requests
+      // Users can manually refresh when needed
+      // status.fetch();
       sidebar.fetchStatus(); // Also update sidebar
     });
     el.activeTopRefreshBtn?.addEventListener('click', () => {
@@ -1212,5 +1246,5 @@
   theme.init();
   sidebar.init();
   initEvents();
-  status.fetch();
+  // status.fetch(); // Supprimé pour éviter les requêtes inutiles au chargement
 })();

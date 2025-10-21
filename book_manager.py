@@ -1,9 +1,9 @@
 """Book download manager handling search and retrieval operations."""
 
-import time, json, re
+import time, json, re, logging
 from pathlib import Path
 from urllib.parse import quote
-from typing import List, Optional, Dict, Union, Callable
+from typing import List, Optional, Dict, Union, Callable, Set
 from threading import Event
 from bs4 import BeautifulSoup, Tag, NavigableString, ResultSet
 
@@ -28,7 +28,9 @@ def search_books(query: str, filters: SearchFilters) -> List[BookInfo]:
     Raises:
         Exception: If no books found or parsing fails
     """
-    logger.info(f"Starting search for query: '{query}' with filters: {filters}")
+    logger.info(f"Starting search for query: '{query}'")
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(f"Search filters: {filters}")
     
     query_html = quote(query)
 
@@ -73,7 +75,8 @@ def search_books(query: str, filters: SearchFilters) -> List[BookInfo]:
         f"{filters_query}"
     )
 
-    logger.debug(f"Search URL: {url}")
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(f"Search URL: {url}")
 
     html = downloader.html_get_page(url)
     if not html:
@@ -89,8 +92,9 @@ def search_books(query: str, filters: SearchFilters) -> List[BookInfo]:
 
     if not tbody:
         logger.warning(f"No results table found for query: {query}")
-        # Log the HTML structure for debugging
-        logger.debug(f"HTML structure received: {html[:500]}...")
+        # Log the HTML structure for debugging (limité en production)
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"HTML structure received: {html[:200]}...")
         raise Exception("No books found. Please try another query.")
 
     books = []
@@ -112,17 +116,17 @@ def search_books(query: str, filters: SearchFilters) -> List[BookInfo]:
                 else:
                     failed_parses += 1
             except Exception as e:
-                logger.error_trace(f"Failed to parse search result row: {e}")
+                logger.error(f"Failed to parse search result row: {e}", exc_info=True)
                 failed_parses += 1
     
     logger.info(f"Search parsing complete: {successful_parses} successful, {failed_parses} failed out of {total_rows} total rows")
     
     if not books and total_rows > 0:
         logger.warning(f"No books were successfully parsed from {total_rows} rows. This might indicate a structure change in the search results.")
-        # Log a sample of the HTML structure for debugging
-        if total_rows > 0:
+        # Log a sample of the HTML structure for debugging (limité en production)
+        if total_rows > 0 and logger.isEnabledFor(logging.DEBUG):
             sample_row = tbody.find_all("tr")[0]
-            logger.debug(f"Sample row HTML structure: {str(sample_row)[:500]}...")
+            logger.debug(f"Sample row HTML structure: {str(sample_row)[:200]}...")
 
     books.sort(
         key=lambda x: (
@@ -140,13 +144,13 @@ def _parse_search_result_row(row: Tag) -> Optional[BookInfo]:
     """Parse a single search result row into a BookInfo object."""
     try:
         # Filtrer rapidement les lignes de publicité pour éviter le bruit dans les logs
-        row_class = row.get('class', [])
-        if isinstance(row_class, list):
-            row_class_str = ' '.join(row_class)
-        else:
-            row_class_str = str(row_class)
+        row_classes = row.get('class', [])
+        # Convertir en liste si ce n'est pas déjà le cas
+        if isinstance(row_classes, str):
+            row_classes = row_classes.split()
             
-        if 'aa-logged-in' in row_class_str or 'ad' in row_class_str.lower():
+        # Vérifier les tokens exacts pour éviter les faux positifs (ex: "address", "adaptive")
+        if 'aa-logged-in' in row_classes or 'ad' in row_classes:
             # Ignorer silencieusement les lignes de publicité
             return None
             
@@ -165,19 +169,30 @@ def _parse_search_result_row(row: Tag) -> Optional[BookInfo]:
             return None
         
         # Fonction helper pour extraire le texte en toute sécurité
-        def safe_extract_text(cell, field_name, index):
+        def safe_extract_text(cells, field_name, index):
+            """
+            Extrait le texte d'une cellule de manière sécurisée.
+            
+            Args:
+                cells: Liste des cellules du tableau
+                field_name: Nom du champ pour les logs
+                index: Index de la cellule à extraire
+                
+            Returns:
+                Texte extrait ou None si erreur
+            """
             if index >= len(cells):
-                logger.warning(f"Cell index {index} out of range for field '{field_name}'. Total cells: {len(cells)}")
+                logger.debug(f"Cell index {index} out of range for field '{field_name}'. Total cells: {len(cells)}")
                 return None
             span = cells[index].find("span")
             if not span:
-                logger.warning(f"No span found for field '{field_name}' at index {index}")
+                logger.debug(f"No span found for field '{field_name}' at index {index}")
                 return None
             
             # Utiliser get_text pour garantir une chaîne de caractères
             text = span.get_text(strip=True)
             if not text:
-                logger.warning(f"Empty text content for field '{field_name}' at index {index}")
+                logger.debug(f"Empty text content for field '{field_name}' at index {index}")
                 return None
             
             return text
@@ -220,9 +235,10 @@ def _parse_search_result_row(row: Tag) -> Optional[BookInfo]:
             size=size,
         )
     except Exception as e:
-        logger.error_trace(f"Error parsing search result row: {e}")
-        # Ajout d'informations détaillées pour le débogage
-        logger.debug(f"Row HTML structure: {str(row)[:500]}...")
+        logger.error(f"Error parsing search result row: {e}", exc_info=True)
+        # Ajout d'informations détaillées pour le débogage (limité en production)
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Row HTML structure: {str(row)[:200]}...")
         return None
 
 
@@ -248,14 +264,16 @@ def get_book_info(book_id: str) -> BookInfo:
 
 def _parse_book_info_page(soup: BeautifulSoup, book_id: str) -> BookInfo:
     """Parse the book info page HTML into a BookInfo object."""
-    logger.debug(f"Parsing book info page for ID: {book_id}")
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(f"Parsing book info page for ID: {book_id}")
     
     data = soup.select_one("body > main > div:nth-of-type(1)")
 
     if not data:
         logger.warning(f"Failed to find main data container for book ID: {book_id}")
-        # Log the HTML structure for debugging
-        logger.debug(f"HTML structure received: {str(soup)[:500]}...")
+        # Log the HTML structure for debugging (limité en production)
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"HTML structure received: {str(soup)[:200]}...")
         raise Exception(f"Failed to parse book info for ID: {book_id}")
 
     preview: str = ""
@@ -445,11 +463,12 @@ def _get_download_urls_from_welib(book_id: str) -> set[str]:
         logger.debug("WELIB usage is disabled")
         return set()
     
-    logger.debug(f"Getting download urls from welib.org for {book_id}")
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(f"Getting download urls from welib.org for {book_id}")
     url = f"https://welib.org/md5/{book_id}"
     
     try:
-        logger.info(f"Fetching welib.org page for {book_id}. This uses the bypasser but won't start downloading yet.")
+        logger.debug(f"Fetching welib.org page for {book_id}. This uses the bypasser but won't start downloading yet.")
         html = downloader.html_get_page(url, use_bypasser=True)
         
         if not html:
@@ -482,19 +501,22 @@ def _get_download_urls_from_welib(book_id: str) -> set[str]:
                 logger.warning(f"Failed to convert welib link to absolute URL for {book_id}: {e}")
         
         result = set(absolute_links)
-        logger.debug(f"Found {len(result)} welib download URLs for {book_id}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Found {len(result)} welib download URLs for {book_id}")
         return result
         
     except Exception as e:
-        logger.error_trace(f"Error getting welib download URLs for {book_id}: {e}")
+        logger.error(f"Error getting welib download URLs for {book_id}: {e}", exc_info=True)
         return set()
 
 def _extract_book_metadata(
     metadata_divs
 ) -> Dict[str, List[str]]:
     """Extract metadata from book info divs."""
-    logger.debug("Extracting book metadata")
-    info: Dict[str, List[str]] = {}
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("Extracting book metadata")
+    # Use Set internally for deduplication, then convert to List
+    info: Dict[str, Set[str]] = {}
 
     try:
         # Validation de la structure des métadonnées
@@ -544,9 +566,10 @@ def _extract_book_metadata(
                 logger.debug(f"Error processing metadata item {i}: {e}")
                 continue
         
-        # make set into list
-        for key, value in info.items():
-            info[key] = list(value)
+        # Convert Set to List for final output
+        final_info: Dict[str, List[str]] = {}
+        for key, value_set in info.items():
+            final_info[key] = list(value_set)
 
         # Filter relevant metadata
         relevant_prefixes = [
@@ -560,12 +583,13 @@ def _extract_book_metadata(
         
         filtered_info = {
             k.strip(): v
-            for k, v in info.items()
+            for k, v in final_info.items()
             if any(k.lower().startswith(prefix.lower()) for prefix in relevant_prefixes)
             and "filename" not in k.lower()
         }
         
-        logger.debug(f"Extracted {len(filtered_info)} metadata fields")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Extracted {len(filtered_info)} metadata fields")
         return filtered_info
         
     except Exception as e:
@@ -599,20 +623,22 @@ def download_book(book_info: BookInfo, book_path: Path, progress_callback: Optio
         try:
             download_url = _get_download_url(link, book_info.title, cancel_flag)
             if download_url != "":
-                logger.info(f"Downloading `{book_info.title}` from `{download_url}`")
+                logger.info(f"Downloading book from server")
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(f"Book: {book_info.title}, URL: {download_url}")
 
                 data = downloader.download_url(download_url, book_info.size or "", progress_callback, cancel_flag)
                 if not data:
                     raise Exception("No data received")
 
-                logger.info(f"Download finished. Writing to {book_path}")
+                logger.info(f"Download finished. Writing to file")
                 with open(book_path, "wb") as f:
                     f.write(data.getbuffer())
-                logger.info(f"Writing `{book_info.title}` successfully")
+                logger.info(f"Book written successfully")
                 return True
 
         except Exception as e:
-            logger.error_trace(f"Failed to download from {link}: {e}")
+            logger.error(f"Failed to download from {link}: {e}", exc_info=True)
             continue
 
     return False
@@ -620,7 +646,8 @@ def download_book(book_info: BookInfo, book_path: Path, progress_callback: Optio
 
 def _get_download_url(link: str, title: str, cancel_flag: Optional[Event] = None, max_retries: int = 3) -> str:
     """Extract actual download URL from various source pages."""
-    logger.debug(f"Extracting download URL from: {link}")
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(f"Extracting download URL from: {link}")
     url = ""
 
     try:
@@ -693,5 +720,5 @@ def _get_download_url(link: str, title: str, cancel_flag: Optional[Event] = None
             return ""
 
     except Exception as e:
-        logger.error_trace(f"Error extracting download URL for {title} from {link}: {e}")
+        logger.error(f"Error extracting download URL for {title} from {link}: {e}", exc_info=True)
         return ""
