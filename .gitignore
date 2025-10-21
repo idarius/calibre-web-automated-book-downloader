@@ -91,7 +91,7 @@ cover/
 
 # Roo
 .roo/
-
+*.md
 # Translations
 *.mo
 *.pot
