@@ -22,6 +22,14 @@
     --border-muted: var(--border-color);
     --bg-soft: var(--card-background);
     --footer-bg: var(--header-bg);
+    
+    /* Standardized z-index hierarchy */
+    --z-content: 1;          /* Normal content */
+    --z-navigation: 25;      /* Header and navigation */
+    --z-overlay: 40;         /* Overlay backgrounds */
+    --z-sidebar: 45;         /* Sidebar panels */
+    --z-dropdowns: 50;       /* Dropdown menus */
+    --z-modals: 100;         /* Modal dialogs */
 }
 
 [data-theme="light"] {
@@ -106,11 +114,11 @@ header {
     transform: translateZ(0);
 }
 
-/* Sticky header with CSS-only shadow effect */
+/* Sticky header with optimized shadow effect */
 header {
     position: sticky;
     top: 0;
-    z-index: 30; /* Reduced to be below sidebar overlay (z-40) */
+    z-index: var(--z-navigation); /* Standardized z-index */
     /* Remove all transitions to prevent conflicts with sticky positioning */
 }
 
@@ -130,25 +138,44 @@ header::before {
     transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
     z-index: -1;
+    will-change: opacity; /* Only animate opacity */
+    transform: translateZ(0); /* Optimized GPU layer */
 }
 
-/* Show shadow when header is not at the top */
-body:not(:has(main:first-child)) header::before,
-body:has(main) header::before {
-    opacity: 1;
-}
-
-/* Alternative approach using scroll-driven animations */
-@supports (animation-timeline: scroll()) {
-    header::before {
-        animation: fadeShadow linear;
-        animation-timeline: scroll(root block);
-        animation-range: 0px 100px;
+/* Modern browsers with :has() support - CSS-only shadow effect */
+@supports selector(:has(*)) {
+    /* Show shadow when header is not at the top */
+    body:not(:has(main:first-child)) header::before,
+    body:has(main) header::before {
+        opacity: 1;
     }
     
-    @keyframes fadeShadow {
-        0% { opacity: 0; }
-        100% { opacity: 1; }
+    /* Alternative approach using scroll-driven animations */
+    @supports (animation-timeline: scroll()) {
+        header::before {
+            animation: fadeShadow linear;
+            animation-timeline: scroll(root block);
+            animation-range: 0px 100px;
+        }
+        
+        @keyframes fadeShadow {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+    }
+}
+
+/* Fallback for browsers without :has() support */
+@supports not (selector(:has(*))) {
+    /* JavaScript will add .scrolled class */
+    header.scrolled::before {
+        opacity: 1;
+    }
+    
+    /* Simple hover effect as additional feedback */
+    header:hover::before {
+        opacity: 0.5;
+        transition: opacity 0.3s ease;
     }
 }
 
@@ -281,13 +308,70 @@ header button:hover {
     background-color: #1e3a5f !important;
 }
 
-/* Performance optimizations */
+/* Performance optimizations - Strategic will-change usage */
 header {
-    will-change: box-shadow;
+    /* No permanent will-change to avoid GPU overuse */
 }
 
-header:not(.sticky) {
+/* Clean up will-change when not needed */
+header:not(:hover)::before {
+    will-change: auto; /* Reset to auto when not interacting */
+}
+
+/* Browser compatibility classes */
+.no-has-support header.scrolled::before {
+    opacity: 1; /* Fallback for browsers without :has() */
+}
+
+.no-backdrop-filter header::before {
+    background: var(--header-bg);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.no-scroll-timeline header::before {
+    /* Ensure basic opacity transition works */
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mobile performance optimizations */
+@media (max-width: 768px) {
+    header::before {
+        will-change: auto; /* Disable GPU acceleration on mobile */
+        backdrop-filter: none; /* Remove expensive blur effect */
+    }
+    
+    .sidebar-badge-pulse {
+        animation: none; /* Disable animations on mobile */
+    }
+}
+
+/* Reduced performance mode */
+.reduced-performance header::before {
+    backdrop-filter: none;
     will-change: auto;
+    background: var(--header-bg);
+}
+
+.reduced-performance .sidebar-badge-pulse {
+    animation: none;
+}
+
+.reduced-performance * {
+    will-change: auto !important;
+}
+
+/* Respect user preferences for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    header::before {
+        will-change: auto !important;
+        transition: none !important;
+    }
+    
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 footer {
@@ -922,15 +1006,29 @@ h1, h2, h3, h4, h5, h6,
 
 .sidebar-badge-pulse {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    will-change: opacity; /* Only for pulsing elements */
 }
 
-/* Smooth transitions for sidebar */
+/* Clean up will-change after animation */
+.sidebar-badge-pulse:not(:hover) {
+    will-change: auto;
+}
+
+/* Smooth transitions for sidebar - Optimized performance */
 #sidebar-panel {
-    will-change: transform;
+    /* will-change applied dynamically when needed */
+}
+
+#sidebar-panel.sidebar-panel-open {
+    will-change: transform; /* Only when open */
 }
 
 #sidebar-overlay {
-    will-change: opacity;
+    /* will-change applied dynamically when needed */
+}
+
+#sidebar-overlay.sidebar-overlay-active {
+    will-change: opacity; /* Only when visible */
     transition: opacity 0.3s ease-in-out;
 }
 

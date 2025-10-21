@@ -2,6 +2,136 @@
 // Reuses existing API endpoints. Keeps logic minimal and accessible.
 
 (function () {
+  // ---- Browser Compatibility Detection ----
+  const compatibility = {
+    // Detect CSS feature support
+    features: {
+      hasSelector: CSS.supports('selector(:has(*))'),
+      scrollTimeline: CSS.supports('animation-timeline: scroll()'),
+      backdropFilter: CSS.supports('backdrop-filter: blur(8px)'),
+      willChange: CSS.supports('will-change: transform'),
+      contain: CSS.supports('contain: layout style paint')
+    },
+    
+    // Initialize compatibility checks and fallbacks
+    init() {
+      this.detectFeatures();
+      this.setupFallbacks();
+      this.optimizeForDevice();
+    },
+    
+    detectFeatures() {
+      console.log('Browser Compatibility Report:', this.features);
+      
+      // Add body classes for CSS targeting
+      if (!this.features.hasSelector) {
+        document.body.classList.add('no-has-support');
+        console.log('🔧 :has() not supported - JavaScript fallback activated');
+      }
+      
+      if (!this.features.backdropFilter) {
+        document.body.classList.add('no-backdrop-filter');
+        console.log('🔧 backdrop-filter not supported - CSS fallback active');
+      }
+      
+      if (!this.features.scrollTimeline) {
+        document.body.classList.add('no-scroll-timeline');
+        console.log('🔧 scroll-driven animations not supported');
+      }
+    },
+    
+    setupFallbacks() {
+      // Setup scroll-based header shadow for browsers without :has()
+      if (!this.features.hasSelector) {
+        this.setupHeaderScrollFallback();
+      }
+    },
+    
+    setupHeaderScrollFallback() {
+      let ticking = false;
+      
+      function updateHeaderShadow() {
+        const header = document.querySelector('header');
+        if (window.scrollY > 10) {
+          header.classList.add('scrolled');
+        } else {
+          header.classList.remove('scrolled');
+        }
+        ticking = false;
+      }
+      
+      // Optimized scroll listener with throttling
+      window.addEventListener('scroll', () => {
+        if (!ticking) {
+          requestAnimationFrame(updateHeaderShadow);
+          ticking = true;
+        }
+      }, { passive: true });
+      
+      // Initial check
+      updateHeaderShadow();
+    },
+    
+    optimizeForDevice() {
+      const isMobile = window.innerWidth <= 768;
+      const isLowEnd = navigator.hardwareConcurrency <= 2;
+      
+      if (isMobile || isLowEnd) {
+        document.body.classList.add('reduced-performance');
+        console.log('📱 Mobile/low-end device detected - performance optimizations active');
+      }
+      
+      // Respect user preferences
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.body.classList.add('reduced-motion');
+        console.log('♿ Reduced motion preference detected');
+      }
+      
+      // Initialize dynamic will-change management
+      this.initDynamicWillChange();
+    },
+    
+    initDynamicWillChange() {
+      // Dynamic will-change management for performance
+      const performanceManager = {
+        elements: new Set(),
+        
+        add(element, property) {
+          if (element && property) {
+            element.style.willChange = property;
+            this.elements.add(element);
+            
+            // Auto-cleanup after 2 seconds
+            setTimeout(() => {
+              this.remove(element);
+            }, 2000);
+          }
+        },
+        
+        remove(element) {
+          if (element && this.elements.has(element)) {
+            element.style.willChange = 'auto';
+            this.elements.delete(element);
+          }
+        },
+        
+        clear() {
+          this.elements.forEach(element => {
+            element.style.willChange = 'auto';
+          });
+          this.elements.clear();
+        }
+      };
+      
+      // Make it globally available
+      window.performanceManager = performanceManager;
+      
+      // Cleanup on page unload
+      window.addEventListener('beforeunload', () => {
+        performanceManager.clear();
+      });
+    }
+  };
   // ---- DOM ----
   const el = {
     searchInput: document.getElementById('search-input'),
@@ -524,7 +654,17 @@
         el.themeMenu.style.top = `${buttonRect.bottom + 2}px`;
         el.themeMenu.style.left = `${buttonRect.left}px`;
         
+        const isOpening = el.themeMenu.classList.contains('hidden');
         el.themeMenu.classList.toggle('hidden');
+        
+        // Optimize performance for dropdown animation
+        if (window.performanceManager) {
+          if (isOpening) {
+            window.performanceManager.add(el.themeMenu, 'opacity, transform');
+          } else {
+            window.performanceManager.remove(el.themeMenu);
+          }
+        }
       });
       // outside click to close
       document.addEventListener('click', (ev) => {
@@ -629,6 +769,12 @@
       el.sidebarOverlay?.classList.add('sidebar-overlay-active');
       el.sidebarPanel?.classList.add('sidebar-panel-open');
       
+      // Optimize performance with dynamic will-change
+      if (window.performanceManager) {
+        window.performanceManager.add(el.sidebarPanel, 'transform');
+        window.performanceManager.add(el.sidebarOverlay, 'opacity');
+      }
+      
       // Prevent background scrolling and compensate for scrollbar width
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.overflow = 'hidden';
@@ -648,6 +794,12 @@
       this.isOpen = false;
       el.sidebarOverlay?.classList.remove('sidebar-overlay-active');
       el.sidebarPanel?.classList.remove('sidebar-panel-open');
+      
+      // Clean up performance optimizations
+      if (window.performanceManager) {
+        window.performanceManager.remove(el.sidebarPanel);
+        window.performanceManager.remove(el.sidebarOverlay);
+      }
       
       // Restore scrolling and remove compensation
       document.body.style.overflow = '';
@@ -1260,6 +1412,7 @@
   // This eliminates all timing conflicts and provides smooth performance
 
   // ---- Init ----
+  compatibility.init(); // Initialize compatibility checks first
   theme.init();
   sidebar.init();
   initEvents();
