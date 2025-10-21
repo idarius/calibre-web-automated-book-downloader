@@ -30,7 +30,19 @@
     activeTopRefreshBtn: document.getElementById('active-refresh-button'),
     themeToggle: document.getElementById('theme-toggle'),
     themeText: document.getElementById('theme-text'),
-    themeMenu: document.getElementById('theme-menu')
+    themeMenu: document.getElementById('theme-menu'),
+    // Sidebar elements
+    sidebarToggle: document.getElementById('sidebar-toggle'),
+    sidebarBadge: document.getElementById('sidebar-badge'),
+    sidebarOverlay: document.getElementById('sidebar-overlay'),
+    sidebarPanel: document.getElementById('sidebar-panel'),
+    sidebarClose: document.getElementById('sidebar-close'),
+    sidebarStatusLoading: document.getElementById('sidebar-status-loading'),
+    sidebarStatusList: document.getElementById('sidebar-status-list'),
+    sidebarNoResults: document.getElementById('sidebar-no-results'),
+    sidebarRefreshBtn: document.getElementById('sidebar-refresh-button'),
+    sidebarClearCompletedBtn: document.getElementById('sidebar-clear-completed-button'),
+    sidebarActiveDownloadsCount: document.getElementById('sidebar-active-downloads-count')
   };
 
   // ---- Constants ----
@@ -45,6 +57,8 @@
     activeDownloads: '/request/api/downloads/active'
   };
   const FILTERS = ['isbn', 'author', 'title', 'lang', 'sort', 'content', 'format'];
+  const SIDEBAR_REFRESH_INTERVAL = 3000; // 3 seconds for faster updates
+  const SIDEBAR_INACTIVITY_TIMEOUT = 30000; // 30 seconds
 
   // ---- Utils ----
   const utils = {
@@ -200,13 +214,66 @@
     },
     async download(book) {
       if (!book) return;
+      
+      // Feedback immédiat optimiste
+      this.showImmediateFeedback(book);
+      
       try {
         await utils.j(`${API.download}?id=${encodeURIComponent(book.id)}`);
-        utils.toast('Queued for download');
+        utils.toast('Livre ajouté à la file de téléchargement');
         modal.close();
         status.fetch();
-      } catch (_){}
-    }
+        sidebar.fetchStatus(); // Also update sidebar
+      } catch (e) {
+        // En cas d'erreur, on retire le feedback optimiste
+        this.hideImmediateFeedback(book);
+        utils.toast('Erreur lors de l\'ajout à la file de téléchargement');
+        console.error('Download error:', e);
+      }
+    },
+    
+    showImmediateFeedback(book) {
+      // Mettre à jour immédiatement le badge du panneau latéral
+      sidebar.incrementBadge();
+      
+      // Ajouter un état visuel sur le bouton de download
+      const downloadBtn = document.querySelector(`[data-action="download"][data-id="${book.id}"]`);
+      if (downloadBtn) {
+        downloadBtn.disabled = true;
+        downloadBtn.innerHTML = `
+          <svg class="animate-spin h-4 w-4 mr-1 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Ajout...
+        `;
+        downloadBtn.classList.add('opacity-75', 'cursor-not-allowed');
+      }
+      
+      // Ajouter l'élément à la liste du panneau latéral immédiatement
+      sidebar.addOptimisticItem(book);
+      
+      // Déclencher un rafraîchissement accéléré après 1 seconde pour récupérer rapidement le statut réel
+      setTimeout(() => {
+        sidebar.fetchStatus(false); // Sans loader pour éviter le flicker
+      }, 1000);
+    },
+    
+    hideImmediateFeedback(book) {
+      // Décrémenter le badge en cas d'erreur
+      sidebar.decrementBadge();
+      
+      // Restaurer le bouton de download
+      const downloadBtn = document.querySelector(`[data-action="download"][data-id="${book.id}"]`);
+      if (downloadBtn) {
+        downloadBtn.disabled = false;
+        downloadBtn.innerHTML = 'Download';
+        downloadBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+      }
+      
+      // Retirer l'élément optimiste du panneau latéral
+      sidebar.removeOptimisticItem(book.id);
+    },
   };
 
   // ---- Status ----
@@ -304,6 +371,7 @@
       try {
         await fetch(`${API.cancelDownload}/${encodeURIComponent(id)}/cancel`, { method: 'DELETE' });
         status.fetch();
+        sidebar.fetchStatus(); // Also update sidebar
       } catch (_){}
     }
   };
@@ -357,6 +425,611 @@
     updateLabel(pref) { if (el.themeText) el.themeText.textContent = `Theme (${pref})`; }
   };
 
+  // ---- Sidebar ----
+  const sidebar = {
+    isOpen: false,
+    refreshTimer: null,
+    inactivityTimer: null,
+    isFetching: false, // Prevent multiple simultaneous requests
+    isVisible: true, // Track if tab is visible
+    hasActiveDownloads: false, // Track if there are active downloads
+    lastData: null, // Cache last data to prevent unnecessary re-renders
+    optimisticItems: new Set(), // Track optimistic items
+    retryTimer: null, // Timer for retry attempts
+    
+    init() {
+      // Bind toggle events
+      el.sidebarToggle?.addEventListener('click', () => this.toggle());
+      el.sidebarClose?.addEventListener('click', () => this.close());
+      el.sidebarOverlay?.addEventListener('click', () => this.close());
+      
+      // Track page visibility for performance optimization
+      document.addEventListener('visibilitychange', () => {
+        this.isVisible = !document.hidden;
+        if (this.isVisible && this.isOpen) {
+          // Refresh when tab becomes visible
+          this.fetchStatus(true); // Show loader when tab becomes visible
+        }
+      });
+      
+      // Bind sidebar buttons
+      el.sidebarRefreshBtn?.addEventListener('click', () => {
+        this.fetchStatus(true); // Show loader for manual refresh
+      });
+      
+      el.sidebarClearCompletedBtn?.addEventListener('click', async () => {
+        try {
+          await fetch(API.clearCompleted, { method: 'DELETE' });
+          this.fetchStatus(true); // Show loader for manual action
+        } catch (_) {}
+      });
+      
+      // Close sidebar on Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && this.isOpen) {
+          this.close();
+        }
+      });
+      
+      // Initial status fetch without loader (background)
+      this.fetchStatus(false);
+      
+      // Ensure sidebar shows valid state after initialization
+      this.ensureValidState();
+    },
+    
+    toggle() {
+      if (this.isOpen) {
+        this.close();
+      } else {
+        this.open();
+      }
+    },
+    
+    open() {
+      this.isOpen = true;
+      el.sidebarOverlay?.classList.add('sidebar-overlay-active');
+      el.sidebarPanel?.classList.add('sidebar-panel-open');
+      document.body.style.overflow = 'hidden'; // Prevent background scrolling
+      
+      // Start auto-refresh
+      this.startAutoRefresh();
+      
+      // Fetch initial data with loader
+      this.fetchStatus(true);
+      
+      // Ensure valid state after opening
+      this.ensureValidState();
+    },
+    
+    close() {
+      this.isOpen = false;
+      el.sidebarOverlay?.classList.remove('sidebar-overlay-active');
+      el.sidebarPanel?.classList.remove('sidebar-panel-open');
+      document.body.style.overflow = ''; // Restore scrolling
+      
+      // Stop auto-refresh when closed
+      this.stopAutoRefresh();
+    },
+    
+    startAutoRefresh() {
+      this.stopAutoRefresh(); // Clear any existing timer
+      this.refreshTimer = setInterval(() => {
+        // Only refresh if sidebar is open and tab is visible
+        if (this.isOpen && this.isVisible) {
+          this.fetchStatus(false); // No loader for auto-refresh
+        }
+      }, SIDEBAR_REFRESH_INTERVAL);
+    },
+    
+    stopAutoRefresh() {
+      if (this.refreshTimer) {
+        clearInterval(this.refreshTimer);
+        this.refreshTimer = null;
+      }
+    },
+    
+    resetInactivityTimer() {
+      // Disabled - let user control opening/closing manually
+      this.clearInactivityTimer();
+    },
+    
+    clearInactivityTimer() {
+      if (this.inactivityTimer) {
+        clearTimeout(this.inactivityTimer);
+        this.inactivityTimer = null;
+      }
+    },
+    
+    async fetchStatus(showLoader = false) {
+      // Prevent multiple simultaneous requests
+      if (this.isFetching) return;
+      
+      try {
+        this.isFetching = true;
+        
+        // Only show loader for manual refresh or initial load
+        if (showLoader) {
+          utils.show(el.sidebarStatusLoading);
+        }
+        
+        // Add a small delay to prevent flicker for fast responses
+        const fetchPromise = utils.j(API.status);
+        const minDelayPromise = new Promise(resolve => setTimeout(resolve, 300));
+        
+        const [data] = await Promise.all([fetchPromise, minDelayPromise]);
+        
+        // Debug logging
+        console.log('Sidebar status data received:', data);
+        
+        // Clear any previous error state
+        this.clearErrorState();
+        
+        // Ensure data is valid before rendering
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid data received from status API');
+        }
+        
+        // Check if data has actually changed before re-rendering
+        const dataStr = JSON.stringify(data);
+        if (this.lastData !== dataStr) {
+          this.render(data);
+          this.lastData = dataStr;
+        }
+        
+        this.updateActiveCount();
+        this.updateBadge();
+      } catch (e) {
+        console.error('Sidebar fetch error:', e);
+        console.error('Error details:', {
+          message: e.message,
+          stack: e.stack,
+          showLoader
+        });
+        
+        // Try to recover with a fallback render
+        this.renderFallback();
+        
+        // Only show error message for manual refresh, not for auto-refresh
+        if (showLoader) {
+          this.showErrorState('Error loading status. Please try again.');
+        } else {
+          // For auto-refresh, don't show error but try to recover
+          this.scheduleRetry();
+        }
+      } finally {
+        if (showLoader) {
+          utils.hide(el.sidebarStatusLoading);
+        }
+        this.isFetching = false;
+        
+        // Ensure valid state after fetch attempt
+        setTimeout(() => this.ensureValidState(), 100);
+      }
+    },
+    
+    clearErrorState() {
+      // Clear any error messages that might be displayed
+      if (el.sidebarStatusList) {
+        const errorElements = el.sidebarStatusList.querySelectorAll('.error-message');
+        errorElements.forEach(el => el.remove());
+      }
+    },
+    
+    showErrorState(message) {
+      if (el.sidebarStatusList) {
+        // Check if we have optimistic items to preserve
+        const hasOptimisticItems = this.optimisticItems.size > 0;
+        
+        if (hasOptimisticItems) {
+          // Show error message but preserve optimistic items
+          const errorDiv = document.createElement('div');
+          errorDiv.className = 'error-message text-sm opacity-80 p-2 border border-red-300 rounded mb-2 bg-red-50 dark:bg-red-900/20';
+          errorDiv.textContent = message;
+          
+          // Insert error at the top
+          if (el.sidebarStatusList.firstChild) {
+            el.sidebarStatusList.insertBefore(errorDiv, el.sidebarStatusList.firstChild);
+          } else {
+            el.sidebarStatusList.appendChild(errorDiv);
+          }
+        } else {
+          // Show full error message
+          el.sidebarStatusList.innerHTML = `<div class="error-message text-sm opacity-80 p-3 border border-red-300 rounded bg-red-50 dark:bg-red-900/20">${message}</div>`;
+        }
+      }
+    },
+    
+    scheduleRetry() {
+      // Schedule a retry after 5 seconds
+      if (!this.retryTimer) {
+        this.retryTimer = setTimeout(() => {
+          this.retryTimer = null;
+          if (this.isOpen) {
+            console.log('Retrying status fetch after error');
+            this.fetchStatus(false); // Retry without showing loader
+          }
+        }, 5000);
+      }
+    },
+    
+    renderFallback() {
+      try {
+        console.log('Rendering fallback content');
+        
+        if (!el.sidebarStatusList) {
+          console.error('Sidebar status list element not found');
+          return;
+        }
+        
+        // Clear any previous error state
+        this.clearErrorState();
+        
+        // Show a minimal fallback content
+        if (this.optimisticItems.size > 0) {
+          // If we have optimistic items, show them
+          const content = `
+            <div>
+              <h4 class="font-semibold mb-2">Queued</h4>
+              <ul class="space-y-2">
+                ${Array.from(this.optimisticItems).map(id => {
+                  return `<li class="p-3 rounded border flex flex-col gap-2 optimistic-item" data-optimistic-id="${id}" style="border-color: var(--border-muted); background: var(--bg-soft); opacity: 0.7; border-style: dashed;">
+                    <div class="text-sm"><span class="opacity-70">queued</span> • <strong>Processing...</strong></div>
+                    <div class="h-2 bg-black/10 rounded overflow-hidden">
+                      <div class="h-2 bg-blue-300 animate-pulse" style="width: 0%"></div>
+                    </div>
+                    <div class="text-xs opacity-60 italic">Ajout à la file d'attente...</div>
+                  </li>`;
+                }).join('')}
+              </ul>
+            </div>
+          `;
+          el.sidebarStatusList.innerHTML = content;
+        } else {
+          // Show empty state with a retry button
+          const content = `
+            <div class="text-sm opacity-80 text-center p-4">
+              <div class="mb-2">No downloads.</div>
+              <button id="sidebar-retry-button" class="px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
+                Retry
+              </button>
+            </div>
+          `;
+          el.sidebarStatusList.innerHTML = content;
+          
+          // Bind retry button
+          const retryBtn = document.getElementById('sidebar-retry-button');
+          if (retryBtn) {
+            retryBtn.addEventListener('click', () => {
+              this.fetchStatus(true); // Show loader for manual retry
+            });
+          }
+        }
+        
+        // Update badge with optimistic items count
+        this.updateBadge();
+      } catch (error) {
+        console.error('Error in fallback render:', error);
+        // Last resort - show minimal content
+        if (el.sidebarStatusList) {
+          el.sidebarStatusList.innerHTML = '<div class="text-sm opacity-80">No downloads.</div>';
+        }
+      }
+    },
+    
+    render(data) {
+      try {
+        console.log('Sidebar render called with data:', data);
+        
+        // Clear any previous error state before rendering
+        this.clearErrorState();
+        
+        // data shape: {queued: {...}, downloading: {...}, completed: {...}, error: {...}}
+        const sections = [];
+        let hasActiveDownloads = false;
+        
+        // Validate data structure more gracefully
+        if (!data || typeof data !== 'object') {
+          console.warn('Invalid data structure in render:', data);
+          // Don't show error immediately, try fallback first
+          this.renderFallback();
+          return;
+        }
+        
+        // Clear optimistic items for books that are now in the real data
+        // But only after a short delay to avoid the "hole" effect
+        setTimeout(() => {
+          for (const [name, items] of Object.entries(data || {})) {
+            if (items && typeof items === 'object') {
+              Object.values(items).forEach(book => {
+                if (book && book.id && this.optimisticItems.has(book.id)) {
+                  this.removeOptimisticItem(book.id);
+                }
+              });
+            }
+          }
+        }, 500); // Short delay to ensure smooth transition
+        
+        for (const [name, items] of Object.entries(data || {})) {
+          if (!items || typeof items !== 'object' || Object.keys(items).length === 0) continue;
+          
+          // Track if there are active downloads
+          if (name === 'downloading' || name === 'queued') {
+            hasActiveDownloads = true;
+          }
+          
+          const rows = Object.values(items).map((b) => {
+            // Validate book object more gracefully
+            if (!b || typeof b !== 'object') {
+              console.warn('Invalid book object:', b);
+              return '';
+            }
+            
+            const titleText = utils.e(b.title) || 'Untitled';
+            const maybeLinkedTitle = b.download_path
+              ? `<a href="/request/api/localdownload?id=${encodeURIComponent(b.id)}" class="text-blue-600 hover:underline">${titleText}</a>`
+              : titleText;
+            const actions = (name === 'queued' || name === 'downloading')
+              ? `<button class="px-2 py-1 rounded border text-xs" data-cancel="${utils.e(b.id)}" style="border-color: var(--border-muted);">Cancel</button>`
+              : '';
+            const progress = (name === 'downloading' && typeof b.progress === 'number')
+              ? `<div class="h-2 bg-black/10 rounded overflow-hidden"><div class="h-2 bg-blue-600" style="width:${Math.round(b.progress)}%"></div></div>`
+              : '';
+            return `<li class="p-3 rounded border flex flex-col gap-2" style="border-color: var(--border-muted); background: var(--bg-soft)">
+              <div class="text-sm"><span class="opacity-70">${utils.e(name)}</span> • <strong>${maybeLinkedTitle}</strong></div>
+              ${progress}
+              <div class="flex items-center gap-2">${actions}</div>
+            </li>`;
+          }).filter(row => row.length > 0).join('');
+          
+          if (rows.length > 0) {
+            sections.push(`
+              <div>
+                <h4 class="font-semibold mb-2">${name.charAt(0).toUpperCase() + name.slice(1)}</h4>
+                <ul class="space-y-2">${rows}</ul>
+              </div>`);
+          }
+        }
+        
+        // Only show "No downloads" if we have no optimistic items either
+        const hasContent = sections.length > 0 || this.optimisticItems.size > 0;
+        const content = hasContent ? sections.join('') : '<div class="text-sm opacity-80">No downloads.</div>';
+        
+        // Only update DOM if content has changed
+        const currentContent = el.sidebarStatusList.innerHTML;
+        if (currentContent !== content) {
+          el.sidebarStatusList.innerHTML = content;
+          
+          // Bind cancel buttons
+          el.sidebarStatusList.querySelectorAll('[data-cancel]')?.forEach((btn) => {
+            btn.addEventListener('click', () => {
+              queue.cancel(btn.getAttribute('data-cancel'));
+            });
+          });
+        }
+        
+        // Update active downloads status
+        this.hasActiveDownloads = hasActiveDownloads;
+        
+        // Reset inactivity timer if there are active downloads
+        if (hasActiveDownloads) {
+          this.resetInactivityTimer();
+        }
+        
+      } catch (error) {
+        console.error('Error in sidebar render:', error);
+        // Try fallback before showing error
+        this.renderFallback();
+      }
+    },
+    
+    async updateActiveCount() {
+      try {
+        const d = await utils.j(API.activeDownloads);
+        console.log('Active downloads data:', d);
+        const n = Array.isArray(d.active_downloads) ? d.active_downloads.length : 0;
+        if (el.sidebarActiveDownloadsCount) el.sidebarActiveDownloadsCount.textContent = `Active: ${n}`;
+      } catch (error) {
+        console.error('Error updating active count:', error);
+        // Set default value on error
+        if (el.sidebarActiveDownloadsCount) el.sidebarActiveDownloadsCount.textContent = `Active: 0`;
+      }
+    },
+    
+    updateBadge() {
+      if (!el.sidebarBadge) return;
+      
+      // Count active downloads by looking at the text content in the sidebar
+      const downloadingItems = Array.from(el.sidebarStatusList?.querySelectorAll('li') || [])
+        .filter(li => li.textContent.includes('downloading') || li.textContent.includes('queued'));
+      
+      // Add optimistic items to the count
+      const totalCount = downloadingItems.length + this.optimisticItems.size;
+      
+      const hasError = Array.from(el.sidebarStatusList?.querySelectorAll('li') || [])
+        .some(li => li.textContent.includes('error'));
+      
+      const hasDownloading = Array.from(el.sidebarStatusList?.querySelectorAll('li') || [])
+        .some(li => li.textContent.includes('downloading'));
+      
+      if (totalCount > 0) {
+        el.sidebarBadge.textContent = totalCount;
+        el.sidebarBadge.classList.add('sidebar-badge-active');
+        
+        // Update badge color based on status
+        el.sidebarBadge.classList.remove('sidebar-badge-error', 'sidebar-badge-downloading');
+        if (hasError) {
+          el.sidebarBadge.classList.add('sidebar-badge-error');
+        } else if (hasDownloading || this.optimisticItems.size > 0) {
+          el.sidebarBadge.classList.add('sidebar-badge-downloading', 'sidebar-badge-pulse');
+        }
+      } else {
+        el.sidebarBadge.classList.remove('sidebar-badge-active', 'sidebar-badge-error', 'sidebar-badge-downloading', 'sidebar-badge-pulse');
+      }
+    },
+    
+    incrementBadge() {
+      if (!el.sidebarBadge) return;
+      
+      // Get current count or default to 0
+      const currentCount = parseInt(el.sidebarBadge.textContent) || 0;
+      const newCount = currentCount + 1;
+      
+      el.sidebarBadge.textContent = newCount;
+      el.sidebarBadge.classList.add('sidebar-badge-active', 'sidebar-badge-downloading', 'sidebar-badge-pulse');
+    },
+    
+    decrementBadge() {
+      if (!el.sidebarBadge) return;
+      
+      const currentCount = parseInt(el.sidebarBadge.textContent) || 0;
+      const newCount = Math.max(0, currentCount - 1);
+      
+      if (newCount > 0) {
+        el.sidebarBadge.textContent = newCount;
+      } else {
+        el.sidebarBadge.classList.remove('sidebar-badge-active', 'sidebar-badge-error', 'sidebar-badge-downloading', 'sidebar-badge-pulse');
+      }
+    },
+    
+    addOptimisticItem(book) {
+      try {
+        console.log('Adding optimistic item for book:', book);
+        this.optimisticItems.add(book.id);
+        
+        // Create optimistic item for sidebar
+        const optimisticItem = document.createElement('li');
+        optimisticItem.className = 'p-3 rounded border flex flex-col gap-2 optimistic-item';
+        optimisticItem.setAttribute('data-optimistic-id', book.id);
+        optimisticItem.style.cssText = 'border-color: var(--border-muted); background: var(--bg-soft); opacity: 0.7; border-style: dashed;';
+        optimisticItem.innerHTML = `
+          <div class="text-sm"><span class="opacity-70">queued</span> • <strong>${utils.e(book.title || 'Untitled')}</strong></div>
+          <div class="h-2 bg-black/10 rounded overflow-hidden">
+            <div class="h-2 bg-blue-300 animate-pulse" style="width: 0%"></div>
+          </div>
+          <div class="text-xs opacity-60 italic">Ajout à la file d'attente...</div>
+        `;
+        
+        // Ensure sidebar list exists
+        if (!el.sidebarStatusList) {
+          console.error('Sidebar status list element not found');
+          return;
+        }
+        
+        // Add to the top of the sidebar list
+        const queuedSection = this.findOrCreateSection('queued');
+        const list = queuedSection.querySelector('ul');
+        if (list) {
+          list.insertBefore(optimisticItem, list.firstChild);
+        } else {
+          console.error('Could not find or create queued section list');
+        }
+        
+        // Auto-remove optimistic item after 30 seconds (fail-safe)
+        // Increased timeout to avoid premature removal
+        setTimeout(() => {
+          this.removeOptimisticItem(book.id);
+        }, 30000);
+      } catch (error) {
+        console.error('Error adding optimistic item:', error);
+      }
+    },
+    
+    removeOptimisticItem(bookId) {
+      this.optimisticItems.delete(bookId);
+      
+      // Check if a real item with the same ID already exists
+      const realItem = el.sidebarStatusList?.querySelector(`[data-cancel="${bookId}"]`);
+      if (realItem) {
+        // Real item exists, just remove the optimistic one
+        const optimisticItem = el.sidebarStatusList?.querySelector(`[data-optimistic-id="${bookId}"]`);
+        if (optimisticItem) {
+          optimisticItem.remove();
+        }
+        return;
+      }
+      
+      // If no real item exists yet, check if we should keep the optimistic one a bit longer
+      const optimisticItem = el.sidebarStatusList?.querySelector(`[data-optimistic-id="${bookId}"]`);
+      if (optimisticItem) {
+        // Add a transition effect before removing
+        optimisticItem.style.transition = 'opacity 0.3s ease-out';
+        optimisticItem.style.opacity = '0.3';
+        
+        // Remove after transition
+        setTimeout(() => {
+          if (optimisticItem.parentNode) {
+            optimisticItem.remove();
+          }
+        }, 300);
+      }
+    },
+    
+    findOrCreateSection(statusName) {
+      try {
+        // Ensure sidebar list exists
+        if (!el.sidebarStatusList) {
+          console.error('Sidebar status list element not found');
+          // Create a dummy section to prevent errors
+          const dummySection = document.createElement('div');
+          dummySection.innerHTML = `
+            <h4 class="font-semibold mb-2">${statusName.charAt(0).toUpperCase() + statusName.slice(1)}</h4>
+            <ul class="space-y-2"></ul>
+          `;
+          return dummySection;
+        }
+        
+        // Find existing section
+        let section = Array.from(el.sidebarStatusList.children || [])
+          .find(child => {
+            const heading = child.querySelector('h4');
+            return heading && heading.textContent.toLowerCase() === statusName;
+          });
+        
+        if (!section) {
+          // Create new section
+          section = document.createElement('div');
+          section.innerHTML = `
+            <h4 class="font-semibold mb-2">${statusName.charAt(0).toUpperCase() + statusName.slice(1)}</h4>
+            <ul class="space-y-2"></ul>
+          `;
+          el.sidebarStatusList.appendChild(section);
+        }
+        
+        return section;
+      } catch (error) {
+        console.error('Error finding or creating section:', error);
+        // Return a dummy section to prevent errors
+        const dummySection = document.createElement('div');
+        dummySection.innerHTML = `
+          <h4 class="font-semibold mb-2">${statusName.charAt(0).toUpperCase() + statusName.slice(1)}</h4>
+          <ul class="space-y-2"></ul>
+        `;
+        return dummySection;
+      }
+    },
+    
+    ensureValidState() {
+      // Ensure sidebar shows valid state, especially after errors
+      try {
+        if (!el.sidebarStatusList) return;
+        
+        const currentContent = el.sidebarStatusList.innerHTML;
+        
+        // Check if current content shows an error
+        if (currentContent.includes('Error rendering status') ||
+            currentContent.includes('Error loading status') ||
+            currentContent.trim() === '') {
+          console.log('Ensuring valid sidebar state');
+          this.renderFallback();
+        }
+      } catch (error) {
+        console.error('Error ensuring valid state:', error);
+        this.renderFallback();
+      }
+    }
+  };
+
   // ---- Wire up ----
   function initEvents() {
     el.searchBtn?.addEventListener('click', () => search.run());
@@ -370,10 +1043,20 @@
       });
     }
 
-    el.refreshStatusBtn?.addEventListener('click', () => status.fetch());
-    el.activeTopRefreshBtn?.addEventListener('click', () => status.fetch());
+    el.refreshStatusBtn?.addEventListener('click', () => {
+      status.fetch();
+      sidebar.fetchStatus(); // Also update sidebar
+    });
+    el.activeTopRefreshBtn?.addEventListener('click', () => {
+      status.fetch();
+      sidebar.fetchStatus(); // Also update sidebar
+    });
     el.clearCompletedBtn?.addEventListener('click', async () => {
-      try { await fetch(API.clearCompleted, { method: 'DELETE' }); status.fetch(); } catch (_) {}
+      try {
+        await fetch(API.clearCompleted, { method: 'DELETE' });
+        status.fetch();
+        sidebar.fetchStatus(); // Also update sidebar
+      } catch (_) {}
     });
 
     // Close modal on overlay click
@@ -382,6 +1065,7 @@
 
   // ---- Init ----
   theme.init();
+  sidebar.init();
   initEvents();
   status.fetch();
 })();

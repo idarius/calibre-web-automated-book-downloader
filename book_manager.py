@@ -28,6 +28,8 @@ def search_books(query: str, filters: SearchFilters) -> List[BookInfo]:
     Raises:
         Exception: If no books found or parsing fails
     """
+    logger.info(f"Starting search for query: '{query}' with filters: {filters}")
+    
     query_html = quote(query)
 
     if filters.isbn:
@@ -71,8 +73,11 @@ def search_books(query: str, filters: SearchFilters) -> List[BookInfo]:
         f"{filters_query}"
     )
 
+    logger.debug(f"Search URL: {url}")
+
     html = downloader.html_get_page(url)
     if not html:
+        logger.error(f"Failed to fetch search results from {url}")
         raise Exception("Failed to fetch search results")
 
     if "No files found." in html:
@@ -84,17 +89,40 @@ def search_books(query: str, filters: SearchFilters) -> List[BookInfo]:
 
     if not tbody:
         logger.warning(f"No results table found for query: {query}")
+        # Log the HTML structure for debugging
+        logger.debug(f"HTML structure received: {html[:500]}...")
         raise Exception("No books found. Please try another query.")
 
     books = []
+    total_rows = 0
+    successful_parses = 0
+    failed_parses = 0
+    
     if isinstance(tbody, Tag):
-        for line_tr in tbody.find_all("tr"):
+        rows = tbody.find_all("tr")
+        total_rows = len(rows)
+        logger.debug(f"Found {total_rows} rows in search results table")
+        
+        for line_tr in rows:
             try:
                 book = _parse_search_result_row(line_tr)
                 if book:
                     books.append(book)
+                    successful_parses += 1
+                else:
+                    failed_parses += 1
             except Exception as e:
                 logger.error_trace(f"Failed to parse search result row: {e}")
+                failed_parses += 1
+    
+    logger.info(f"Search parsing complete: {successful_parses} successful, {failed_parses} failed out of {total_rows} total rows")
+    
+    if not books and total_rows > 0:
+        logger.warning(f"No books were successfully parsed from {total_rows} rows. This might indicate a structure change in the search results.")
+        # Log a sample of the HTML structure for debugging
+        if total_rows > 0:
+            sample_row = tbody.find_all("tr")[0]
+            logger.debug(f"Sample row HTML structure: {str(sample_row)[:500]}...")
 
     books.sort(
         key=lambda x: (
@@ -104,6 +132,7 @@ def search_books(query: str, filters: SearchFilters) -> List[BookInfo]:
         )
     )
 
+    logger.info(f"Returning {len(books)} books for query: '{query}'")
     return books
 
 
@@ -111,22 +140,71 @@ def _parse_search_result_row(row: Tag) -> Optional[BookInfo]:
     """Parse a single search result row into a BookInfo object."""
     try:
         cells = row.find_all("td")
+        
+        # Validation du nombre de cellules attendues (minimum 11 pour les indices utilisés)
+        expected_min_cells = 11
+        if len(cells) < expected_min_cells:
+            logger.warning(f"Invalid table row structure: expected at least {expected_min_cells} cells, got {len(cells)}. Row content: {str(row)[:200]}...")
+            return None
+        
+        # Validation des liens pour l'ID
+        links = row.find_all("a")
+        if not links or not links[0].has_attr("href"):
+            logger.warning(f"Invalid table row structure: no valid links found for ID. Row content: {str(row)[:200]}...")
+            return None
+        
+        # Fonction helper pour extraire le texte en toute sécurité
+        def safe_extract_text(cell, field_name, index):
+            if index >= len(cells):
+                logger.warning(f"Cell index {index} out of range for field '{field_name}'. Total cells: {len(cells)}")
+                return None
+            span = cells[index].find("span")
+            if not span or not span.next:
+                logger.warning(f"No span or span content found for field '{field_name}' at index {index}")
+                return None
+            return span.next
+        
+        # Extraction sécurisée de l'ID
+        book_id = links[0]["href"].split("/")[-1]
+        
+        # Extraction sécurisée de l'image de prévisualisation
         preview_img = cells[0].find("img")
-        preview = preview_img["src"] if preview_img else None
-
+        preview = preview_img["src"] if preview_img and preview_img.has_attr("src") else None
+        
+        # Extraction sécurisée des autres champs
+        title = safe_extract_text(cells, "title", 1)
+        author = safe_extract_text(cells, "author", 2)
+        publisher = safe_extract_text(cells, "publisher", 3)
+        year = safe_extract_text(cells, "year", 4)
+        language = safe_extract_text(cells, "language", 7)
+        
+        # Extraction sécurisée du format (avec conversion en minuscules)
+        format_text = safe_extract_text(cells, "format", 9)
+        format_lower = format_text.lower() if format_text else None
+        
+        # Extraction sécurisée de la taille
+        size = safe_extract_text(cells, "size", 10)
+        
+        # Vérification que les champs obligatoires sont présents
+        if not book_id or not title:
+            logger.warning(f"Missing required fields (id: {bool(book_id)}, title: {bool(title)}). Skipping row.")
+            return None
+        
         return BookInfo(
-            id=row.find_all("a")[0]["href"].split("/")[-1],
+            id=book_id,
             preview=preview,
-            title=cells[1].find("span").next,
-            author=cells[2].find("span").next,
-            publisher=cells[3].find("span").next,
-            year=cells[4].find("span").next,
-            language=cells[7].find("span").next,
-            format=cells[9].find("span").next.lower(),
-            size=cells[10].find("span").next,
+            title=title,
+            author=author,
+            publisher=publisher,
+            year=year,
+            language=language,
+            format=format_lower,
+            size=size,
         )
     except Exception as e:
         logger.error_trace(f"Error parsing search result row: {e}")
+        # Ajout d'informations détaillées pour le débogage
+        logger.debug(f"Row HTML structure: {str(row)[:500]}...")
         return None
 
 
@@ -152,9 +230,14 @@ def get_book_info(book_id: str) -> BookInfo:
 
 def _parse_book_info_page(soup: BeautifulSoup, book_id: str) -> BookInfo:
     """Parse the book info page HTML into a BookInfo object."""
+    logger.debug(f"Parsing book info page for ID: {book_id}")
+    
     data = soup.select_one("body > main > div:nth-of-type(1)")
 
     if not data:
+        logger.warning(f"Failed to find main data container for book ID: {book_id}")
+        # Log the HTML structure for debugging
+        logger.debug(f"HTML structure received: {str(soup)[:500]}...")
         raise Exception(f"Failed to parse book info for ID: {book_id}")
 
     preview: str = ""
@@ -167,8 +250,20 @@ def _parse_book_info_page(soup: BeautifulSoup, book_id: str) -> BookInfo:
         else:
             preview = preview_value
 
-    data = soup.find_all("div", {"class": "main-inner"})[0].find_next("div")
+    main_inner_divs = soup.find_all("div", {"class": "main-inner"})
+    if not main_inner_divs:
+        logger.warning(f"No main-inner div found for book ID: {book_id}")
+        raise Exception(f"Failed to parse book info structure for ID: {book_id}")
+    
+    data = main_inner_divs[0].find_next("div")
+    if not data:
+        logger.warning(f"No data div found after main-inner for book ID: {book_id}")
+        raise Exception(f"Failed to parse book info structure for ID: {book_id}")
+    
     divs = list(data.children)
+    if not divs:
+        logger.warning(f"No child divs found in data container for book ID: {book_id}")
+        raise Exception(f"Failed to parse book info structure for ID: {book_id}")
 
     every_url = soup.find_all("a")
     slow_urls_no_waitlist = set()
@@ -228,9 +323,25 @@ def _parse_book_info_page(soup: BeautifulSoup, book_id: str) -> BookInfo:
 
     separator_index = 6
     for i, div in enumerate(divs):
-        if "·" in div.strip():
+        if hasattr(div, 'strip') and "·" in div.strip():
             separator_index = i
             break
+    
+    # Validation de l'index du séparateur
+    if separator_index >= len(divs):
+        logger.warning(f"Separator index {separator_index} out of range for {len(divs)} divs in book ID: {book_id}")
+        separator_index = min(6, len(divs) - 1)
+    
+    if not hasattr(divs[separator_index], 'strip'):
+        logger.warning(f"Div at separator index {separator_index} is not a text element for book ID: {book_id}")
+        # Essayer de trouver un élément textuel valide
+        for i, div in enumerate(divs):
+            if hasattr(div, 'strip') and div.strip():
+                separator_index = i
+                break
+        else:
+            logger.error(f"No valid text div found for book ID: {book_id}")
+            raise Exception(f"Failed to parse book details for ID: {book_id}")
             
     _details = divs[separator_index].lower().split(" · ")
     format = ""
@@ -249,22 +360,57 @@ def _parse_book_info_page(soup: BeautifulSoup, book_id: str) -> BookInfo:
                 size = f.strip().lower()
 
     
-    book_title = divs[separator_index-3].strip("🔍")
+    # Validation de l'index pour le titre
+    title_index = separator_index - 3
+    if title_index < 0 or title_index >= len(divs):
+        logger.warning(f"Title index {title_index} out of range for {len(divs)} divs in book ID: {book_id}")
+        title_index = max(0, min(title_index, len(divs) - 1))
+    
+    if not hasattr(divs[title_index], 'strip'):
+        logger.warning(f"Title div at index {title_index} is not a text element for book ID: {book_id}")
+        book_title = f"Unknown Title (ID: {book_id})"
+    else:
+        book_title = divs[title_index].strip("🔍")
+
+    # Extraction sécurisée de l'éditeur et de l'auteur
+    publisher_index = separator_index - 1
+    author_index = separator_index - 2
+    
+    publisher = None
+    author = None
+    
+    if 0 <= publisher_index < len(divs) and hasattr(divs[publisher_index], 'strip'):
+        publisher = divs[publisher_index]
+    else:
+        logger.warning(f"Publisher index {publisher_index} out of range for book ID: {book_id}")
+    
+    if 0 <= author_index < len(divs) and hasattr(divs[author_index], 'strip'):
+        author = divs[author_index]
+    else:
+        logger.warning(f"Author index {author_index} out of range for book ID: {book_id}")
 
     # Extract basic information
     book_info = BookInfo(
         id=book_id,
         preview=preview,
         title=book_title,
-        publisher=divs[separator_index-1],
-        author=divs[separator_index-2],
+        publisher=publisher,
+        author=author,
         format=format,
         size=size,
         download_urls=urls,
     )
 
-    # Extract additional metadata
-    info = _extract_book_metadata(original_divs[-6])
+    # Extraction sécurisée des métadonnées
+    if len(original_divs) >= 6:
+        try:
+            info = _extract_book_metadata(original_divs[-6])
+        except Exception as e:
+            logger.warning(f"Failed to extract metadata for book ID: {book_id}: {e}")
+            info = {}
+    else:
+        logger.warning(f"Not enough divs ({len(original_divs)}) to extract metadata for book ID: {book_id}")
+        info = {}
     book_info.info = info
 
     # Set language and year from metadata if available
@@ -276,59 +422,137 @@ def _parse_book_info_page(soup: BeautifulSoup, book_id: str) -> BookInfo:
     return book_info
 
 def _get_download_urls_from_welib(book_id: str) -> set[str]:
-    if ALLOW_USE_WELIB == False:
-        return set()
     """Get download urls from welib.org."""
+    if ALLOW_USE_WELIB == False:
+        logger.debug("WELIB usage is disabled")
+        return set()
+    
+    logger.debug(f"Getting download urls from welib.org for {book_id}")
     url = f"https://welib.org/md5/{book_id}"
-    logger.info(f"Getting download urls from welib.org for {book_id}. While this uses the bypasser, it will not start downloading them yet.")
-    html = downloader.html_get_page(url, use_bypasser=True)
-    if not html:
-        return []
-    soup = BeautifulSoup(html, "html.parser")
-    download_links = soup.find_all("a", href=True)
-    download_links = [link["href"] for link in download_links]
-    download_links = [link for link in download_links if "/slow_download/" in link]
-    download_links = [downloader.get_absolute_url(url, link) for link in download_links]
-    return set(download_links)
+    
+    try:
+        logger.info(f"Fetching welib.org page for {book_id}. This uses the bypasser but won't start downloading yet.")
+        html = downloader.html_get_page(url, use_bypasser=True)
+        
+        if not html:
+            logger.warning(f"Failed to fetch welib.org page for {book_id}")
+            return set()
+        
+        soup = BeautifulSoup(html, "html.parser")
+        download_links = soup.find_all("a", href=True)
+        
+        if not download_links:
+            logger.warning(f"No download links found on welib.org page for {book_id}")
+            return set()
+        
+        # Filtrer les liens de téléchargement
+        download_links = [link["href"] for link in download_links if link.has_attr("href")]
+        download_links = [link for link in download_links if "/slow_download/" in link]
+        
+        if not download_links:
+            logger.warning(f"No slow_download links found on welib.org page for {book_id}")
+            return set()
+        
+        # Convertir en URLs absolues
+        absolute_links = []
+        for link in download_links:
+            try:
+                absolute_link = downloader.get_absolute_url(url, link)
+                if absolute_link:
+                    absolute_links.append(absolute_link)
+            except Exception as e:
+                logger.warning(f"Failed to convert welib link to absolute URL for {book_id}: {e}")
+        
+        result = set(absolute_links)
+        logger.debug(f"Found {len(result)} welib download URLs for {book_id}")
+        return result
+        
+    except Exception as e:
+        logger.error_trace(f"Error getting welib download URLs for {book_id}: {e}")
+        return set()
 
 def _extract_book_metadata(
     metadata_divs
 ) -> Dict[str, List[str]]:
     """Extract metadata from book info divs."""
+    logger.debug("Extracting book metadata")
     info: Dict[str, List[str]] = {}
 
-    # Process the first set of metadata
-    sub_datas = metadata_divs.find_all("div")[0]
-    sub_datas = list(sub_datas.children)
-    for sub_data in sub_datas:
-        if sub_data.text.strip() == "":
-            continue
-        sub_data = list(sub_data.children)
-        key = sub_data[0].text.strip()
-        value = sub_data[1].text.strip()
-        if key not in info:
-            info[key] = set()
-        info[key].add(value)
-    
-    # make set into list
-    for key, value in info.items():
-        info[key] = list(value)
+    try:
+        # Validation de la structure des métadonnées
+        if not metadata_divs:
+            logger.warning("No metadata divs provided")
+            return {}
+        
+        # Process the first set of metadata
+        all_divs = metadata_divs.find_all("div")
+        if not all_divs:
+            logger.warning("No divs found in metadata container")
+            return {}
+        
+        sub_datas = all_divs[0]
+        sub_datas = list(sub_datas.children)
+        
+        for i, sub_data in enumerate(sub_datas):
+            try:
+                if not hasattr(sub_data, 'text') or sub_data.text.strip() == "":
+                    continue
+                
+                sub_data_children = list(sub_data.children)
+                if len(sub_data_children) < 2:
+                    logger.debug(f"Skipping metadata item {i}: not enough children")
+                    continue
+                
+                # Extraction sécurisée de la clé et de la valeur
+                key_element = sub_data_children[0]
+                value_element = sub_data_children[1]
+                
+                if not hasattr(key_element, 'text') or not hasattr(value_element, 'text'):
+                    logger.debug(f"Skipping metadata item {i}: elements don't have text attribute")
+                    continue
+                
+                key = key_element.text.strip()
+                value = value_element.text.strip()
+                
+                if not key or not value:
+                    logger.debug(f"Skipping metadata item {i}: empty key or value")
+                    continue
+                
+                if key not in info:
+                    info[key] = set()
+                info[key].add(value)
+                
+            except Exception as e:
+                logger.debug(f"Error processing metadata item {i}: {e}")
+                continue
+        
+        # make set into list
+        for key, value in info.items():
+            info[key] = list(value)
 
-    # Filter relevant metadata
-    relevant_prefixes = [
-        "ISBN-",
-        "ALTERNATIVE",
-        "ASIN",
-        "Goodreads",
-        "Language",
-        "Year",
-    ]
-    return {
-        k.strip(): v
-        for k, v in info.items()
-        if any(k.lower().startswith(prefix.lower()) for prefix in relevant_prefixes)
-        and "filename" not in k.lower()
-    }
+        # Filter relevant metadata
+        relevant_prefixes = [
+            "ISBN-",
+            "ALTERNATIVE",
+            "ASIN",
+            "Goodreads",
+            "Language",
+            "Year",
+        ]
+        
+        filtered_info = {
+            k.strip(): v
+            for k, v in info.items()
+            if any(k.lower().startswith(prefix.lower()) for prefix in relevant_prefixes)
+            and "filename" not in k.lower()
+        }
+        
+        logger.debug(f"Extracted {len(filtered_info)} metadata fields")
+        return filtered_info
+        
+    except Exception as e:
+        logger.warning(f"Error extracting book metadata: {e}")
+        return {}
 
 
 def download_book(book_info: BookInfo, book_path: Path, progress_callback: Optional[Callable[[float], None]] = None, cancel_flag: Optional[Event] = None) -> bool:
@@ -378,38 +602,73 @@ def download_book(book_info: BookInfo, book_path: Path, progress_callback: Optio
 
 def _get_download_url(link: str, title: str, cancel_flag: Optional[Event] = None) -> str:
     """Extract actual download URL from various source pages."""
-
+    logger.debug(f"Extracting download URL from: {link}")
     url = ""
 
-    if link.startswith(f"{AA_BASE_URL}/dyn/api/fast_download.json"):
-        page = downloader.html_get_page(link)
-        url = json.loads(page).get("download_url")
-    else:
-        html = downloader.html_get_page(link)
+    try:
+        if link.startswith(f"{AA_BASE_URL}/dyn/api/fast_download.json"):
+            page = downloader.html_get_page(link)
+            if not page:
+                logger.warning(f"Failed to fetch fast download page for {title}")
+                return ""
+            
+            try:
+                response_data = json.loads(page)
+                url = response_data.get("download_url")
+                if not url:
+                    logger.warning(f"No download URL found in fast download response for {title}")
+                    return ""
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse fast download JSON response for {title}: {e}")
+                return ""
+        else:
+            html = downloader.html_get_page(link)
 
-        if html == "":
+            if not html or html == "":
+                logger.warning(f"Empty HTML response from {link} for {title}")
+                return ""
+
+            soup = BeautifulSoup(html, "html.parser")
+
+            if link.startswith("https://z-lib."):
+                download_link = soup.find_all("a", href=True, class_="addDownloadedBook")
+                if download_link:
+                    url = download_link[0]["href"]
+                else:
+                    logger.warning(f"No download link found for z-lib book {title}")
+            elif "/slow_download/" in link:
+                download_links = soup.find_all("a", href=True, string="📚 Download now")
+                if not download_links:
+                    countdown = soup.find_all("span", class_="js-partner-countdown")
+                    if countdown:
+                        try:
+                            sleep_time = int(countdown[0].text)
+                            logger.info(f"Waiting {sleep_time}s for {title}")
+                            if cancel_flag is not None and cancel_flag.wait(timeout=sleep_time):
+                                logger.info(f"Cancelled wait for {title}")
+                                return ""
+                            url = _get_download_url(link, title, cancel_flag)
+                        except (ValueError, IndexError) as e:
+                            logger.warning(f"Invalid countdown value for {title}: {e}")
+                    else:
+                        logger.warning(f"No countdown or download link found for {title}")
+                else:
+                    url = download_links[0]["href"]
+            else:
+                get_links = soup.find_all("a", string="GET")
+                if get_links:
+                    url = get_links[0]["href"]
+                else:
+                    logger.warning(f"No GET link found for {title}")
+
+        if url:
+            absolute_url = downloader.get_absolute_url(link, url)
+            logger.debug(f"Successfully extracted download URL for {title}")
+            return absolute_url
+        else:
+            logger.warning(f"No download URL extracted for {title}")
             return ""
 
-        soup = BeautifulSoup(html, "html.parser")
-
-        if link.startswith("https://z-lib."):
-            download_link = soup.find_all("a", href=True, class_="addDownloadedBook")
-            if download_link:
-                url = download_link[0]["href"]
-        elif "/slow_download/" in link:
-            download_links = soup.find_all("a", href=True, string="📚 Download now")
-            if not download_links:
-                countdown = soup.find_all("span", class_="js-partner-countdown")
-                if countdown:
-                    sleep_time = int(countdown[0].text)
-                    logger.info(f"Waiting {sleep_time}s for {title}")
-                    if cancel_flag is not None and cancel_flag.wait(timeout=sleep_time):
-                        logger.info(f"Cancelled wait for {title}")
-                        return ""
-                    url = _get_download_url(link, title, cancel_flag)
-            else:
-                url = download_links[0]["href"]
-        else:
-            url = soup.find_all("a", string="GET")[0]["href"]
-
-    return downloader.get_absolute_url(link, url)
+    except Exception as e:
+        logger.error_trace(f"Error extracting download URL for {title} from {link}: {e}")
+        return ""

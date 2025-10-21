@@ -660,3 +660,153 @@ h1, h2, h3, h4, h5, h6,
     -webkit-backdrop-filter: blur(10px) !important;
     border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
+
+/* Sidebar Panel Styles */
+.sidebar-panel-open {
+    transform: translateX(0) !important;
+}
+
+.sidebar-overlay-active {
+    display: block !important;
+}
+
+/* Sidebar Badge Styles */
+.sidebar-badge-active {
+    display: flex !important;
+}
+
+.sidebar-badge-downloading {
+    background-color: #f59e0b !important; /* Amber for downloading */
+}
+
+.sidebar-badge-error {
+    background-color: #ef4444 !important; /* Red for errors */
+}
+
+/* Responsive Sidebar */
+@media (max-width: 640px) {
+    #sidebar-panel {
+        max-width: 100%;
+        width: 100%;
+    }
+}
+
+/* Animation for badge pulse */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.sidebar-badge-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Smooth transitions for sidebar */
+#sidebar-panel {
+    will-change: transform;
+}
+
+#sidebar-overlay {
+    will-change: opacity;
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* Custom scrollbar for sidebar content */
+#sidebar-panel .overflow-y-auto::-webkit-scrollbar {
+    width: 6px;
+}
+
+#sidebar-panel .overflow-y-auto::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+#sidebar-panel .overflow-y-auto::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 3px;
+}
+
+#sidebar-panel .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* Reduce flicker with smooth transitions */
+#sidebar-status-list {
+    transition: opacity 0.2s ease-in-out;
+}
+
+#sidebar-status-list.updating {
+    opacity: 0.7;
+}
+
+/* Smooth progress bar animations */
+#sidebar-status-list .h-2.bg-blue-600 {
+    transition: width 0.3s ease-in-out;
+}
+
+/* Prevent layout shift during updates */
+#sidebar-status-list li {
+    min-height: 80px;
+}
+
+/* Loading state with subtle animation */
+@keyframes subtle-pulse {
+    0%, 100% {
+        opacity: 0.6;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+/* Loading state with subtle animation */
+#sidebar-status-loading {
+    animation: subtle-pulse 1.5s ease-in-out infinite;
+}
+
+/* Spin animation for loading buttons */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Optimistic item styles */
+.optimistic-item {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 0.7;
+        transform: translateY(0);
+    }
+}
+
+/* Download button states */
+button:disabled {
+    cursor: not-allowed !important;
+    opacity: 0.6 !important;
+}
+
+.cursor-not-allowed {
+    cursor: not-allowed !important;
+}
+
+#sidebar-status-loading {
+    animation: subtle-pulse 1.5s ease-in-out infinite;
+}
