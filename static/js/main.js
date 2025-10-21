@@ -143,6 +143,7 @@
     sort: document.getElementById('sort-input'),
     content: document.getElementById('content-input'),
     resultsGrid: document.getElementById('results-grid'),
+    resultsContainer: document.getElementById('results-container'),
     noResults: document.getElementById('no-results'),
     searchLoading: document.getElementById('search-loading'),
     modalOverlay: document.getElementById('modal-overlay'),
@@ -159,6 +160,10 @@
     themeToggle: document.getElementById('theme-toggle'),
     themeText: document.getElementById('theme-text'),
     themeMenu: document.getElementById('theme-menu'),
+    // View toggle elements
+    viewToggleContainer: document.getElementById('view-toggle-container'),
+    viewGridBtn: document.getElementById('view-grid'),
+    viewListBtn: document.getElementById('view-list'),
     // Sidebar elements
     sidebarToggle: document.getElementById('sidebar-toggle'),
     sidebarBadge: document.getElementById('sidebar-badge'),
@@ -187,6 +192,11 @@
   const FILTERS = ['isbn', 'author', 'title', 'lang', 'sort', 'content', 'format'];
   const SIDEBAR_REFRESH_INTERVAL = 10000; // 10 seconds to reduce server load
   const SIDEBAR_INACTIVITY_TIMEOUT = 30000; // 30 seconds
+  const VIEW_PREFERENCE_KEY = 'preferred-view-mode';
+  const VIEW_MODES = {
+    GRID: 'grid',
+    LIST: 'list'
+  };
   
   // ---- API Cache ----
   const apiCache = {
@@ -371,28 +381,328 @@
   }
 
   function renderCards(books) {
-    el.resultsGrid.innerHTML = '';
-    if (!books || books.length === 0) {
-      utils.show(el.noResults);
-      return;
-    }
-    utils.hide(el.noResults);
-    const frag = document.createDocumentFragment();
-    books.forEach((b) => frag.appendChild(renderCard(b)));
-    el.resultsGrid.appendChild(frag);
+    viewManager.renderGrid(books);
   }
+
+  function renderListItem(book) {
+    // Créer un élément de tableau détaillé
+    const row = document.createElement('tr');
+    row.className = 'border-b';
+    row.style.borderColor = 'var(--border-muted)';
+    
+    // Fonction pour nettoyer les données de l'éditeur
+    const cleanPublisher = (publisher) => {
+      if (!publisher) return '-';
+      // Prendre seulement la première partie avant la première virgule ou parenthèse
+      const cleaned = publisher.split(',')[0].split('(')[0].trim();
+      return cleaned || '-';
+    };
+    
+    // Fonction pour nettoyer les données de l'auteur
+    const cleanAuthor = (author) => {
+      if (!author) return 'Unknown author';
+      
+      // Essayer d'extraire le nom complet (nom + prénom) avant les séparateurs
+      const patterns = [
+        /^(.+?)\s*\[/,  // Avant le premier crochet
+        /^(.+?)\s*;/,   // Avant le premier point-virgule
+        /^(.+?)\s*-\s/, // Avant le premier tiret avec espaces
+        /^(.+?)\s*\(/,  // Avant la première parenthèse
+      ];
+      
+      for (const pattern of patterns) {
+        const match = author.match(pattern);
+        if (match && match[1]) {
+          let cleaned = match[1].trim();
+          
+          // Si le nom contient des virgules, essayer de prendre les deux premières parties (nom, prénom)
+          if (cleaned.includes(',')) {
+            const parts = cleaned.split(',').map(p => p.trim());
+            if (parts.length >= 2) {
+              // Inverser pour avoir "Prénom Nom" au lieu de "Nom, Prénom"
+              cleaned = parts[1] + ' ' + parts[0];
+            } else {
+              cleaned = parts[0];
+            }
+          }
+          
+          // Limiter à un nom raisonnable (max 30 caractères)
+          if (cleaned.length > 30) {
+            const words = cleaned.split(/\s+/);
+            if (words.length >= 2) {
+              // Prendre les deux premiers mots (généralement prénom + nom)
+              cleaned = words.slice(0, 2).join(' ');
+            } else {
+              cleaned = cleaned.substring(0, 30);
+            }
+          }
+          
+          // Vérifier si c'est un nom propre (contient au moins une majuscule)
+          if (/[A-Z]/.test(cleaned) && cleaned.length > 1) {
+            return cleaned;
+          }
+        }
+      }
+      
+      // Si aucun pattern ne correspond, essayer de trouver les deux premiers mots avec majuscules
+      const words = author.split(/\s+/);
+      const capitalizedWords = words.filter(word => /[A-Z]/.test(word) && word.length > 1);
+      
+      if (capitalizedWords.length >= 2) {
+        return capitalizedWords.slice(0, 2).join(' ');
+      } else if (capitalizedWords.length === 1) {
+        return capitalizedWords[0];
+      }
+      
+      // En dernier recours, retourner les deux premiers mots
+      if (words.length >= 2) {
+        return words.slice(0, 2).join(' ');
+      } else {
+        return words[0] || 'Unknown author';
+      }
+    };
+    
+    // Cellule Preview
+    const previewCell = document.createElement('td');
+    previewCell.className = 'p-3';
+    
+    // Vérifier si on est sur mobile (désactiver le zoom sur mobile)
+    const isMobile = window.innerWidth <= 768;
+    
+    if (book.preview && !isMobile) {
+      const coverContainer = document.createElement('div');
+      coverContainer.className = 'cover-zoom-container';
+      
+      const coverImg = document.createElement('img');
+      coverImg.src = utils.e(book.preview);
+      coverImg.alt = 'Cover';
+      coverImg.className = 'book-cover w-12 h-16 object-cover rounded cursor-pointer';
+      coverImg.setAttribute('data-book-id', utils.e(book.id));
+      coverImg.setAttribute('data-src', utils.e(book.preview));
+      
+      // Ajouter le gestionnaire d'événements pour le zoom animé
+      coverImg.addEventListener('click', (e) => {
+        e.stopPropagation();
+        coverZoomManager.showZoomedImage(coverImg);
+      });
+      
+      coverContainer.appendChild(coverImg);
+      previewCell.appendChild(coverContainer);
+    } else if (book.preview && isMobile) {
+      // Sur mobile, juste l'image sans zoom
+      const coverImg = document.createElement('img');
+      coverImg.src = utils.e(book.preview);
+      coverImg.alt = 'Cover';
+      coverImg.className = 'w-12 h-16 object-cover rounded';
+      previewCell.appendChild(coverImg);
+    } else {
+      // Pas d'image disponible
+      const noCover = document.createElement('div');
+      noCover.className = 'w-12 h-16 rounded flex items-center justify-center opacity-70 text-xs';
+      noCover.style.background = 'var(--bg-soft)';
+      noCover.textContent = 'No Cover';
+      previewCell.appendChild(noCover);
+    }
+    
+    // Cellule Title
+    const titleCell = document.createElement('td');
+    titleCell.className = 'p-3 font-medium';
+    titleCell.textContent = utils.e(book.title) || 'Untitled';
+    
+    // Cellule Author (nettoyée)
+    const authorCell = document.createElement('td');
+    authorCell.className = 'p-3';
+    authorCell.textContent = cleanAuthor(book.author);
+    
+    // Cellule Publisher (nettoyée)
+    const publisherCell = document.createElement('td');
+    publisherCell.className = 'p-3';
+    publisherCell.textContent = cleanPublisher(book.publisher);
+    
+    // Cellule Year
+    const yearCell = document.createElement('td');
+    yearCell.className = 'p-3';
+    yearCell.textContent = utils.e(book.year) || '-';
+    
+    // Cellule Language
+    const languageCell = document.createElement('td');
+    languageCell.className = 'p-3';
+    languageCell.textContent = utils.e(book.language) || '-';
+    
+    // Cellule Format
+    const formatCell = document.createElement('td');
+    formatCell.className = 'p-3';
+    formatCell.textContent = utils.e(book.format) || '-';
+    
+    // Cellule Size
+    const sizeCell = document.createElement('td');
+    sizeCell.className = 'p-3';
+    sizeCell.textContent = utils.e(book.size) || '-';
+    
+    // Cellule Actions (verticale)
+    const actionsCell = document.createElement('td');
+    actionsCell.className = 'p-3';
+    const actionsContainer = document.createElement('div');
+    actionsContainer.className = 'flex flex-col gap-1 items-center';
+    
+    const detailsBtn = document.createElement('button');
+    detailsBtn.className = 'px-2 py-1 rounded border text-xs w-full';
+    detailsBtn.style.borderColor = 'var(--border-muted)';
+    detailsBtn.textContent = 'Details';
+    detailsBtn.setAttribute('data-action', 'details');
+    detailsBtn.setAttribute('data-id', utils.e(book.id));
+    detailsBtn.addEventListener('click', () => bookDetails.show(book.id));
+    
+    const downloadBtn = document.createElement('button');
+    downloadBtn.className = 'px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs w-full';
+    downloadBtn.textContent = 'Download';
+    downloadBtn.setAttribute('data-action', 'download');
+    downloadBtn.setAttribute('data-id', utils.e(book.id));
+    downloadBtn.addEventListener('click', () => bookDetails.download(book));
+    
+    actionsContainer.appendChild(detailsBtn);
+    actionsContainer.appendChild(downloadBtn);
+    actionsCell.appendChild(actionsContainer);
+    
+    // Assembler la ligne
+    row.appendChild(previewCell);
+    row.appendChild(titleCell);
+    row.appendChild(authorCell);
+    row.appendChild(publisherCell);
+    row.appendChild(yearCell);
+    row.appendChild(languageCell);
+    row.appendChild(formatCell);
+    row.appendChild(sizeCell);
+    row.appendChild(actionsCell);
+    
+    return row;
+  }
+
+  // ---- View Management ----
+  const viewManager = {
+    currentView: VIEW_MODES.GRID,
+    
+    init() {
+      // Récupérer la préférence sauvegardée
+      const savedView = localStorage.getItem(VIEW_PREFERENCE_KEY) || VIEW_MODES.GRID;
+      this.currentView = savedView;
+      this.updateViewButtons();
+      
+      // Bind events
+      el.viewGridBtn?.addEventListener('click', () => this.setView(VIEW_MODES.GRID));
+      el.viewListBtn?.addEventListener('click', () => this.setView(VIEW_MODES.LIST));
+    },
+    
+    setView(viewMode) {
+      if (this.currentView === viewMode) return;
+      
+      this.currentView = viewMode;
+      localStorage.setItem(VIEW_PREFERENCE_KEY, viewMode);
+      this.updateViewButtons();
+      
+      // Re-render les résultats avec la nouvelle vue
+      const currentData = window.lastSearchResults || [];
+      this.renderResults(currentData);
+    },
+    
+    updateViewButtons() {
+      // Mettre à jour l'état actif des boutons
+      document.querySelectorAll('.view-toggle').forEach(btn => {
+        if (btn.getAttribute('data-view') === this.currentView) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+      
+      // Mettre à jour les classes du conteneur
+      if (el.resultsContainer) {
+        el.resultsContainer.classList.remove('grid-view', 'list-view');
+        el.resultsContainer.classList.add(`${this.currentView}-view`);
+      }
+    },
+    
+    renderResults(books) {
+      if (this.currentView === VIEW_MODES.GRID) {
+        this.renderGrid(books);
+      } else {
+        this.renderList(books);
+      }
+    },
+    
+    renderGrid(books) {
+      // Utiliser la fonction renderCards existante mais avec resultsContainer
+      el.resultsContainer.innerHTML = '';
+      if (!books || books.length === 0) {
+        utils.show(el.noResults);
+        return;
+      }
+      utils.hide(el.noResults);
+      const frag = document.createDocumentFragment();
+      books.forEach((b) => frag.appendChild(renderCard(b)));
+      el.resultsContainer.appendChild(frag);
+    },
+    
+    renderList(books) {
+      el.resultsContainer.innerHTML = '';
+      if (!books || books.length === 0) {
+        utils.show(el.noResults);
+        return;
+      }
+      utils.hide(el.noResults);
+      
+      // Créer la structure du tableau
+      const table = document.createElement('div');
+      table.className = 'overflow-x-auto';
+      table.innerHTML = `
+        <table class="w-full border-collapse" style="border-color: var(--border-muted);">
+          <thead>
+            <tr style="background: var(--bg-soft);">
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Preview</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Title</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Author</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Publisher</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Year</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Language</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Format</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Size</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="results-tbody">
+            <!-- Les lignes seront injectées ici -->
+          </tbody>
+        </table>
+      `;
+      
+      el.resultsContainer.appendChild(table);
+      const tbody = document.getElementById('results-tbody');
+      
+      // Ajouter chaque livre comme une ligne séparée
+      books.forEach((book) => {
+        const row = renderListItem(book);
+        tbody.appendChild(row);
+      });
+    }
+  };
 
   // ---- Search ----
   const search = {
     async run() {
       const qs = utils.buildQuery();
-      if (!qs) { renderCards([]); return; }
+      if (!qs) {
+        window.lastSearchResults = [];
+        viewManager.renderResults([]);
+        return;
+      }
       utils.show(el.searchLoading);
       try {
         const data = await utils.j(`${API.search}?${qs}`);
-        renderCards(data);
+        window.lastSearchResults = data; // Stocker pour le changement de vue
+        viewManager.renderResults(data);
       } catch (e) {
-        renderCards([]);
+        window.lastSearchResults = [];
+        viewManager.renderResults([]);
       } finally {
         utils.hide(el.searchLoading);
       }
@@ -1411,11 +1721,213 @@
   // No JavaScript needed - using CSS pseudo-elements for shadow effect
   // This eliminates all timing conflicts and provides smooth performance
 
+  // ---- Animated Cover Zoom Manager ----
+  const coverZoomManager = {
+    currentZoomedImage: null,
+    isAnimating: false,
+    
+    showZoomedImage(thumbnailImg) {
+      // Désactiver sur mobile
+      if (window.innerWidth <= 768) return;
+      
+      // Si une image est déjà zoomée, la fermer d'abord
+      if (this.currentZoomedImage && !this.isAnimating) {
+        this.hideZoomedImage();
+      }
+      
+      // Ne pas continuer si on est déjà en train d'animer
+      if (this.isAnimating) return;
+      
+      this.isAnimating = true;
+      
+      // Récupérer la position de l'image miniature
+      const rect = thumbnailImg.getBoundingClientRect();
+      const src = thumbnailImg.getAttribute('data-src');
+      
+      // Créer l'image zoomée
+      const zoomedImage = document.createElement('img');
+      zoomedImage.src = src;
+      zoomedImage.className = 'animated-zoom-image';
+      zoomedImage.style.position = 'fixed';
+      zoomedImage.style.zIndex = '1000';
+      zoomedImage.style.borderRadius = '12px';
+      zoomedImage.style.boxShadow = '0 16px 64px rgba(0, 0, 0, 0.4)';
+      zoomedImage.style.cursor = 'pointer';
+      zoomedImage.style.transformOrigin = 'top left';
+      
+      // Positionner initialement à la même place que la miniature
+      zoomedImage.style.left = `${rect.left}px`;
+      zoomedImage.style.top = `${rect.top}px`;
+      zoomedImage.style.width = `${rect.width}px`;
+      zoomedImage.style.height = `${rect.height}px`;
+      zoomedImage.style.objectFit = 'cover';
+      
+      // Ajouter au DOM
+      document.body.appendChild(zoomedImage);
+      
+      // Créer l'arrière-plan
+      const backdrop = document.createElement('div');
+      backdrop.className = 'zoom-backdrop';
+      backdrop.style.position = 'fixed';
+      backdrop.style.top = '0';
+      backdrop.style.left = '0';
+      backdrop.style.right = '0';
+      backdrop.style.bottom = '0';
+      backdrop.style.background = 'rgba(0, 0, 0, 0.8)';
+      backdrop.style.zIndex = '999';
+      backdrop.style.opacity = '0';
+      backdrop.style.transition = 'opacity 0.3s ease';
+      
+      document.body.appendChild(backdrop);
+      
+      // Forcer le chargement de l'image avant l'animation
+      zoomedImage.onload = () => {
+        // Calculer la taille cible (plus grande mais adaptée à l'écran)
+        const maxWidth = window.innerWidth * 0.8;
+        const maxHeight = window.innerHeight * 0.8;
+        
+        // Ratio de l'image
+        const imgRatio = zoomedImage.naturalWidth / zoomedImage.naturalHeight;
+        
+        // Calculer la taille cible en respectant le ratio
+        let targetWidth, targetHeight;
+        if (maxWidth / maxHeight > imgRatio) {
+          targetHeight = maxHeight;
+          targetWidth = maxHeight * imgRatio;
+        } else {
+          targetWidth = maxWidth;
+          targetHeight = maxWidth / imgRatio;
+        }
+        
+        // Position cible (centre de l'écran)
+        const targetLeft = (window.innerWidth - targetWidth) / 2;
+        const targetTop = (window.innerHeight - targetHeight) / 2;
+        
+        // Démarrer l'animation (plus rapide à l'ouverture)
+        requestAnimationFrame(() => {
+          zoomedImage.style.transition = 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+          zoomedImage.style.left = `${targetLeft}px`;
+          zoomedImage.style.top = `${targetTop}px`;
+          zoomedImage.style.width = `${targetWidth}px`;
+          zoomedImage.style.height = `${targetHeight}px`;
+          
+          backdrop.style.opacity = '1';
+        });
+        
+        // Marquer la fin de l'animation
+        setTimeout(() => {
+          this.isAnimating = false;
+        }, 250);
+      };
+      
+      // Stocker les références
+      this.currentZoomedImage = zoomedImage;
+      this.currentBackdrop = backdrop;
+      
+      // Ajouter les gestionnaires d'événements pour fermer
+      const closeHandler = (e) => {
+        e.stopPropagation();
+        this.hideZoomedImage();
+      };
+      
+      zoomedImage.addEventListener('click', closeHandler);
+      backdrop.addEventListener('click', closeHandler);
+      
+      // Fermer avec Escape
+      const escapeHandler = (e) => {
+        if (e.key === 'Escape') {
+          this.hideZoomedImage();
+        }
+      };
+      document.addEventListener('keydown', escapeHandler);
+      
+      // Stocker les gestionnaires pour pouvoir les retirer plus tard
+      this.zoomCloseHandler = closeHandler;
+      this.escapeHandler = escapeHandler;
+    },
+    
+    hideZoomedImage() {
+      if (this.isAnimating || !this.currentZoomedImage) return;
+      
+      this.isAnimating = true;
+      
+      const zoomedImage = this.currentZoomedImage;
+      const backdrop = this.currentBackdrop;
+      
+      // Retirer les gestionnaires d'événements
+      if (this.zoomCloseHandler) {
+        zoomedImage.removeEventListener('click', this.zoomCloseHandler);
+        backdrop.removeEventListener('click', this.zoomCloseHandler);
+      }
+      
+      if (this.escapeHandler) {
+        document.removeEventListener('keydown', this.escapeHandler);
+      }
+      
+      // Animation de retour (plus rapide et réactive)
+      requestAnimationFrame(() => {
+        // Trouver l'image miniature d'origine
+        const bookId = zoomedImage.getAttribute('data-book-id');
+        const thumbnailImg = document.querySelector(`.book-cover[data-book-id="${bookId}"]`);
+        
+        if (thumbnailImg) {
+          const rect = thumbnailImg.getBoundingClientRect();
+          
+          // Animer vers la position de la miniature (plus rapide et plus réactive)
+          zoomedImage.style.transition = 'all 0.2s cubic-bezier(0.55, 0.055, 0.675, 0.19)';
+          zoomedImage.style.left = `${rect.left}px`;
+          zoomedImage.style.top = `${rect.top}px`;
+          zoomedImage.style.width = `${rect.width}px`;
+          zoomedImage.style.height = `${rect.height}px`;
+          
+          backdrop.style.opacity = '0';
+          
+          // Retirer du DOM après l'animation
+          setTimeout(() => {
+            if (zoomedImage.parentNode) {
+              zoomedImage.parentNode.removeChild(zoomedImage);
+            }
+            if (backdrop.parentNode) {
+              backdrop.parentNode.removeChild(backdrop);
+            }
+            this.currentZoomedImage = null;
+            this.currentBackdrop = null;
+            this.isAnimating = false;
+          }, 200);
+        } else {
+          // Si on ne trouve pas la miniature, juste disparaître (plus rapide)
+          zoomedImage.style.transition = 'opacity 0.15s ease';
+          zoomedImage.style.opacity = '0';
+          backdrop.style.opacity = '0';
+          
+          setTimeout(() => {
+            if (zoomedImage.parentNode) {
+              zoomedImage.parentNode.removeChild(zoomedImage);
+            }
+            if (backdrop.parentNode) {
+              backdrop.parentNode.removeChild(backdrop);
+            }
+            this.currentZoomedImage = null;
+            this.currentBackdrop = null;
+            this.isAnimating = false;
+          }, 150);
+        }
+      });
+    }
+  };
+
+  // ---- Cover Zoom Events ----
+  function initCoverZoomEvents() {
+    // Pas besoin de gestionnaires globaux, tout est géré par coverZoomManager
+  }
+
   // ---- Init ----
   compatibility.init(); // Initialize compatibility checks first
   compatibility.initDynamicWillChange(); // Initialize performance manager
   theme.init();
+  viewManager.init(); // Initialize view manager
   sidebar.init();
   initEvents();
+  initCoverZoomEvents(); // Initialize cover zoom events
   // status.fetch(); // Supprimé pour éviter les requêtes inutiles au chargement
 })();

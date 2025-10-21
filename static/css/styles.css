@@ -220,6 +220,27 @@ header a:focus {
     border-radius: 4px;
 }
 
+/* Supprimer complètement le cadre bleu au clic sur le logo */
+header a:active,
+header a:focus,
+header a:focus-visible,
+header a:visited {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+header a:active h1,
+header a:focus h1,
+header a:visited h1 {
+    color: inherit !important;
+}
+
+/* Supprimer le focus outline pour tous les états */
+header a::-moz-focus-inner {
+    border: 0;
+}
+
 /* Mobile optimizations for touch targets */
 @media (max-width: 768px) {
     header a {
@@ -1125,4 +1146,254 @@ button:disabled {
 
 #sidebar-status-loading {
     animation: subtle-pulse 1.5s ease-in-out infinite;
+}
+
+/* View Toggle Buttons */
+#view-toggle-container {
+    background: var(--bg-soft);
+}
+
+.view-toggle {
+    color: var(--text);
+    transition: all 0.2s ease;
+    border-radius: 0;
+}
+
+.view-toggle:first-child {
+    border-radius: 4px 0 0 4px;
+}
+
+.view-toggle:last-child {
+    border-radius: 0 4px 4px 0;
+}
+
+.view-toggle:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.view-toggle.active {
+    background: var(--primary-color, #0073e6);
+    color: white;
+}
+
+/* List View Styles */
+#results-container.list-view {
+    display: block;
+}
+
+/* Table styles for list view */
+#results-container.list-view table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-soft);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#results-container.list-view th {
+    background: var(--bg-soft);
+    font-weight: 600;
+    text-align: left;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+#results-container.list-view td {
+    vertical-align: middle;
+}
+
+#results-container.list-view tr:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] #results-container.list-view tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark-blue"] #results-container.list-view tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Cover zoom effect */
+.cover-zoom-container {
+    position: relative;
+    display: inline-block;
+}
+
+.book-cover {
+    transition: transform 0.2s ease-in-out;
+    position: relative;
+    z-index: 1;
+}
+
+/* Les images de couverture n'ont plus de zoom au survol */
+.book-cover {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.book-cover:hover {
+    opacity: 0.8;
+}
+
+/* Ensure zoom doesn't break layout */
+#results-container.list-view td {
+    position: relative;
+    overflow: visible;
+}
+
+#results-container.list-view td:first-child {
+    width: 80px; /* Fixed width for cover column */
+}
+
+/* Allow image to overflow container */
+.cover-zoom-container {
+    position: relative;
+    overflow: visible;
+}
+
+/* Styles pour l'image zoomée animée */
+.animated-zoom-image {
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.zoom-backdrop {
+    transition: opacity 0.3s ease;
+}
+
+/* Grid View Styles (default) */
+#results-container.grid-view {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+    #results-container.grid-view {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1024px) {
+    #results-container.grid-view {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1280px) {
+    #results-container.grid-view {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+/* Responsive adjustments for list view */
+@media (max-width: 768px) {
+    #results-container.list-view {
+        font-size: 0.875rem;
+    }
+    
+    #results-container.list-view th,
+    #results-container.list-view td {
+        padding: 0.5rem;
+    }
+    
+    #results-container.list-view td:first-child {
+        width: 60px;
+    }
+    
+    .book-cover {
+        width: 32px;
+        height: 48px;
+    }
+    
+    .book-cover:hover,
+    .book-cover.zoomed {
+        transform: scale(1.5);
+    }
+    
+    /* Hide some columns on very small screens */
+    #results-container.list-view th:nth-child(4),
+    #results-container.list-view td:nth-child(4),
+    #results-container.list-view th:nth-child(8),
+    #results-container.list-view td:nth-child(8) {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    /* Hide more columns on very small screens */
+    #results-container.list-view th:nth-child(5),
+    #results-container.list-view td:nth-child(5),
+    #results-container.list-view th:nth-child(6),
+    #results-container.list-view td:nth-child(6) {
+        display: none;
+    }
+    
+    #results-container.list-view .flex.gap-2 {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+}
+
+/* Enhanced zoom effect for dark themes */
+[data-theme="dark"] .book-cover:hover,
+[data-theme="dark-blue"] .book-cover:hover {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Smooth transitions for table rows */
+#results-container.list-view tr {
+    transition: background-color 0.2s ease;
+}
+
+/* Better focus styles for accessibility */
+#results-container.list-view button:focus {
+    outline: 2px solid var(--primary-color, #0073e6);
+    outline-offset: 2px;
+}
+
+/* Loading state for table */
+#results-container.list-view.loading tbody::after {
+    content: "Loading...";
+    display: table-cell;
+    text-align: center;
+    padding: 2rem;
+    opacity: 0.7;
+}
+
+/* Theme-specific overrides for view toggle buttons */
+[data-theme="light"] .view-toggle:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .view-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark-blue"] .view-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Dark Blue theme specific enhancements */
+[data-theme="dark-blue"] #view-toggle-container {
+    background: var(--card-background) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+}
+
+[data-theme="dark-blue"] #results-container.list-view article {
+    background: var(--card-background) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+    transition: all 0.3s ease !important;
+}
+
+[data-theme="dark-blue"] #results-container.list-view article:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
 }
