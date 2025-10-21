@@ -15,12 +15,24 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="min-h-screen" style="background: var(--bg); color: var(--text);">
+    <!-- Theme Dropdown (moved outside header to prevent clipping) -->
+    <div id="theme-menu" class="fixed right-4 w-36 rounded-md shadow-lg ring-1 ring-black/5 hidden z-[60]" style="background: var(--bg-soft);">
+        <ul class="py-1 text-sm">
+            <li><a href="#" data-theme="light" class="block px-3 py-1 hover:bg-black/10">Light</a></li>
+            <li><a href="#" data-theme="dark" class="block px-3 py-1 hover:bg-black/10">Dark</a></li>
+            <li><a href="#" data-theme="dark-blue" class="block px-3 py-1 hover:bg-black/10">Dark Blue</a></li>
+            <li><a href="#" data-theme="auto" class="block px-3 py-1 hover:bg-black/10">Auto (System)</a></li>
+        </ul>
+    </div>
+    
     <!-- Header -->
-    <header class="w-full border-b border-[color:var(--border-muted)]" style="background: var(--header-bg);">
+    <header class="w-full border-b border-[color:var(--border-muted)] sticky top-0 z-50" style="background: var(--header-bg);" role="banner">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <img src="{{ url_for('static', filename='media/logo.png') }}" alt="Logo" class="h-8 w-8">
-                <h1 class="text-lg font-semibold">Book Search & Download</h1>
+                <a href="/" class="flex items-center gap-3 group hover:opacity-90 transition-opacity duration-200" aria-label="Retour à l'accueil">
+                    <img src="{{ url_for('static', filename='media/logo.png') }}" alt="Logo Book Search & Download" role="img" class="h-8 w-8">
+                    <h1 class="text-lg font-semibold group-hover:text-blue-400 transition-colors duration-200">Book Search & Download</h1>
+                </a>
             </div>
             <div class="flex items-center gap-2">
                 {% if debug %}
@@ -51,14 +63,6 @@
                     <button id="theme-toggle" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">
                         <span id="theme-text">Theme</span>
                     </button>
-                    <div id="theme-menu" class="absolute right-0 mt-2 w-36 rounded-md shadow-lg ring-1 ring-black/5 hidden" style="background: var(--bg-soft);">
-                        <ul class="py-1 text-sm">
-                            <li><a href="#" data-theme="light" class="block px-3 py-1 hover:bg-black/10">Light</a></li>
-                            <li><a href="#" data-theme="dark" class="block px-3 py-1 hover:bg-black/10">Dark</a></li>
-                            <li><a href="#" data-theme="dark-blue" class="block px-3 py-1 hover:bg-black/10">Dark Blue</a></li>
-                            <li><a href="#" data-theme="auto" class="block px-3 py-1 hover:bg-black/10">Auto (System)</a></li>
-                        </ul>
-                    </div>
                 </div>
             </div>
         </div>

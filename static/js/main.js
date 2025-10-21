@@ -518,6 +518,12 @@
       el.themeToggle?.addEventListener('click', (e) => {
         e.preventDefault();
         if (!el.themeMenu) return;
+        
+        // Position the dropdown dynamically relative to the button (left-aligned)
+        const buttonRect = el.themeToggle.getBoundingClientRect();
+        el.themeMenu.style.top = `${buttonRect.bottom + 2}px`;
+        el.themeMenu.style.left = `${buttonRect.left}px`;
+        
         el.themeMenu.classList.toggle('hidden');
       });
       // outside click to close
@@ -622,7 +628,11 @@
       this.isOpen = true;
       el.sidebarOverlay?.classList.add('sidebar-overlay-active');
       el.sidebarPanel?.classList.add('sidebar-panel-open');
-      document.body.style.overflow = 'hidden'; // Prevent background scrolling
+      
+      // Prevent background scrolling and compensate for scrollbar width
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
       
       // Start auto-refresh
       this.startAutoRefresh();
@@ -638,7 +648,10 @@
       this.isOpen = false;
       el.sidebarOverlay?.classList.remove('sidebar-overlay-active');
       el.sidebarPanel?.classList.remove('sidebar-panel-open');
-      document.body.style.overflow = ''; // Restore scrolling
+      
+      // Restore scrolling and remove compensation
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
       
       // Stop auto-refresh when closed
       this.stopAutoRefresh();
@@ -1241,6 +1254,10 @@
     // Close modal on overlay click
     el.modalOverlay?.addEventListener('click', (e) => { if (e.target === el.modalOverlay) modal.close(); });
   }
+
+  // ---- Sticky Header (CSS-only approach) ----
+  // No JavaScript needed - using CSS pseudo-elements for shadow effect
+  // This eliminates all timing conflicts and provides smooth performance
 
   // ---- Init ----
   theme.init();
