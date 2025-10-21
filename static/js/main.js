@@ -59,6 +59,89 @@
   const FILTERS = ['isbn', 'author', 'title', 'lang', 'sort', 'content', 'format'];
   const SIDEBAR_REFRESH_INTERVAL = 3000; // 3 seconds for faster updates
   const SIDEBAR_INACTIVITY_TIMEOUT = 30000; // 30 seconds
+  
+  // ---- API Cache ----
+  const apiCache = {
+    status: null,
+    activeDownloads: null,
+    lastStatusFetch: 0,
+    lastActiveFetch: 0,
+    ttl: 2000, // 2 seconds cache TTL
+    
+    isValid(endpoint) {
+      const now = Date.now();
+      if (endpoint === 'status') {
+        return this.status !== null && (now - this.lastStatusFetch) < this.ttl;
+      } else if (endpoint === 'activeDownloads') {
+        return this.activeDownloads !== null && (now - this.lastActiveFetch) < this.ttl;
+      }
+      return false;
+    },
+    
+    get(endpoint) {
+      if (endpoint === 'status') {
+        return this.status;
+      } else if (endpoint === 'activeDownloads') {
+        return this.activeDownloads;
+      }
+      return null;
+    },
+    
+    set(endpoint, data) {
+      const now = Date.now();
+      if (endpoint === 'status') {
+        this.status = data;
+        this.lastStatusFetch = now;
+      } else if (endpoint === 'activeDownloads') {
+        this.activeDownloads = data;
+        this.lastActiveFetch = now;
+      }
+    },
+    
+    clear(endpoint) {
+      if (endpoint === 'status') {
+        this.status = null;
+      } else if (endpoint === 'activeDownloads') {
+        this.activeDownloads = null;
+      }
+    },
+    
+    clearAll() {
+      this.status = null;
+      this.activeDownloads = null;
+      this.lastStatusFetch = 0;
+      this.lastActiveFetch = 0;
+    }
+  };
+
+  // ---- DOM Utils ----
+  const dom = {
+    safeSetHTML(elementId, content) {
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.innerHTML = content;
+      } else {
+        console.warn(`Element with ID '${elementId}' not found`);
+      }
+    },
+    
+    safeGetElement(elementId) {
+      const element = document.getElementById(elementId);
+      if (!element) {
+        console.warn(`Element with ID '${elementId}' not found`);
+      }
+      return element;
+    },
+    
+    safeAppendHTML(elementId, content) {
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.insertAdjacentHTML('beforeend', content);
+      } else {
+        console.warn(`Element with ID '${elementId}' not found`);
+      }
+    }
+  };
 
   // ---- Utils ----
   const utils = {
@@ -67,7 +150,22 @@
     async j(url, opts = {}) {
       const res = await fetch(url, opts);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      return res.json();
+      
+      try {
+        return await res.json();
+      } catch (e) {
+        // Fallback pour les réponses non-JSON
+        const text = await res.text();
+        if (text.trim() === '') {
+          return null; // Pour les réponses 204
+        }
+        // Tenter de parser manuellement
+        try {
+          return JSON.parse(text);
+        } catch {
+          return { text }; // Retourner le texte dans un objet
+        }
+      }
     },
     // Build query string from basic + advanced filters
     buildQuery() {
@@ -287,7 +385,7 @@
         this.renderTop(data);
         this.updateActive();
       } catch (e) {
-        el.statusList.innerHTML = '<div class="text-sm opacity-80">Error loading status.</div>';
+        dom.safeSetHTML('status-list', '<div class="text-sm opacity-80">Error loading status.</div>');
       } finally { utils.hide(el.statusLoading); }
     },
     render(data) {
@@ -318,11 +416,13 @@
             <ul class="space-y-2">${rows}</ul>
           </div>`);
       }
-      el.statusList.innerHTML = sections.join('') || '<div class="text-sm opacity-80">No items.</div>';
-      // Bind cancel buttons
-      el.statusList.querySelectorAll('[data-cancel]')?.forEach((btn) => {
-        btn.addEventListener('click', () => queue.cancel(btn.getAttribute('data-cancel')));
-      });
+      if (el.statusList) {
+        el.statusList.innerHTML = sections.join('') || '<div class="text-sm opacity-80">No items.</div>';
+        // Bind cancel buttons
+        el.statusList.querySelectorAll('[data-cancel]')?.forEach((btn) => {
+          btn.addEventListener('click', () => queue.cancel(btn.getAttribute('data-cancel')));
+        });
+      }
     },
     // Render compact active downloads list near the search bar
     renderTop(data) {
@@ -330,8 +430,12 @@
         const downloading = (data && data.downloading) ? Object.values(data.downloading) : [];
         if (!el.activeTopSec || !el.activeTopList) return;
         if (!downloading.length) {
-          el.activeTopList.innerHTML = '';
-          el.activeTopSec.classList.add('hidden');
+          if (el.activeTopList) {
+            el.activeTopList.innerHTML = '';
+          }
+          if (el.activeTopSec) {
+            el.activeTopSec.classList.add('hidden');
+          }
           return;
         }
         // Build compact rows with title and progress bar + cancel
@@ -348,17 +452,31 @@
             ${prog}
           </div>`;
         }).join('');
-        el.activeTopList.innerHTML = rows;
-        el.activeTopSec.classList.remove('hidden');
+        if (el.activeTopList) {
+          el.activeTopList.innerHTML = rows;
+        }
+        if (el.activeTopSec) {
+          el.activeTopSec.classList.remove('hidden');
+        }
         // Bind cancel handlers for the top section
-        el.activeTopList.querySelectorAll('[data-cancel]')?.forEach((btn) => {
-          btn.addEventListener('click', () => queue.cancel(btn.getAttribute('data-cancel')));
-        });
+        if (el.activeTopList) {
+          el.activeTopList.querySelectorAll('[data-cancel]')?.forEach((btn) => {
+            btn.addEventListener('click', () => queue.cancel(btn.getAttribute('data-cancel')));
+          });
+        }
       } catch (_) {}
     },
     async updateActive() {
       try {
-        const d = await utils.j(API.activeDownloads);
+        // Use cache to avoid redundant requests
+        let d;
+        if (apiCache.isValid('activeDownloads')) {
+          d = apiCache.get('activeDownloads');
+        } else {
+          d = await utils.j(API.activeDownloads);
+          apiCache.set('activeDownloads', d);
+        }
+        
         const n = Array.isArray(d.active_downloads) ? d.active_downloads.length : 0;
         if (el.activeDownloadsCount) el.activeDownloadsCount.textContent = `Active: ${n}`;
       } catch (_) {}
@@ -553,11 +671,19 @@
           utils.show(el.sidebarStatusLoading);
         }
         
-        // Add a small delay to prevent flicker for fast responses
-        const fetchPromise = utils.j(API.status);
-        const minDelayPromise = new Promise(resolve => setTimeout(resolve, 300));
-        
-        const [data] = await Promise.all([fetchPromise, minDelayPromise]);
+        // Check cache first to avoid redundant requests
+        let data;
+        if (apiCache.isValid('status')) {
+          data = apiCache.get('status');
+          console.log('Using cached status data');
+        } else {
+          // Add a small delay to prevent flicker for fast responses
+          const fetchPromise = utils.j(API.status);
+          const minDelayPromise = new Promise(resolve => setTimeout(resolve, 300));
+          
+          [data] = await Promise.all([fetchPromise, minDelayPromise]);
+          apiCache.set('status', data);
+        }
         
         // Debug logging
         console.log('Sidebar status data received:', data);
@@ -635,7 +761,9 @@
           }
         } else {
           // Show full error message
-          el.sidebarStatusList.innerHTML = `<div class="error-message text-sm opacity-80 p-3 border border-red-300 rounded bg-red-50 dark:bg-red-900/20">${message}</div>`;
+          if (el.sidebarStatusList) {
+            el.sidebarStatusList.innerHTML = `<div class="error-message text-sm opacity-80 p-3 border border-red-300 rounded bg-red-50 dark:bg-red-900/20">${message}</div>`;
+          }
         }
       }
     },
@@ -684,7 +812,9 @@
               </ul>
             </div>
           `;
-          el.sidebarStatusList.innerHTML = content;
+          if (el.sidebarStatusList) {
+            el.sidebarStatusList.innerHTML = content;
+          }
         } else {
           // Show empty state with a retry button
           const content = `
@@ -695,7 +825,9 @@
               </button>
             </div>
           `;
-          el.sidebarStatusList.innerHTML = content;
+          if (el.sidebarStatusList) {
+            el.sidebarStatusList.innerHTML = content;
+          }
           
           // Bind retry button
           const retryBtn = document.getElementById('sidebar-retry-button');
@@ -712,7 +844,9 @@
         console.error('Error in fallback render:', error);
         // Last resort - show minimal content
         if (el.sidebarStatusList) {
-          el.sidebarStatusList.innerHTML = '<div class="text-sm opacity-80">No downloads.</div>';
+          if (el.sidebarStatusList) {
+            el.sidebarStatusList.innerHTML = '<div class="text-sm opacity-80">No downloads.</div>';
+          }
         }
       }
     },
@@ -796,16 +930,18 @@
         const content = hasContent ? sections.join('') : '<div class="text-sm opacity-80">No downloads.</div>';
         
         // Only update DOM if content has changed
-        const currentContent = el.sidebarStatusList.innerHTML;
-        if (currentContent !== content) {
-          el.sidebarStatusList.innerHTML = content;
-          
-          // Bind cancel buttons
-          el.sidebarStatusList.querySelectorAll('[data-cancel]')?.forEach((btn) => {
-            btn.addEventListener('click', () => {
-              queue.cancel(btn.getAttribute('data-cancel'));
+        if (el.sidebarStatusList) {
+          const currentContent = el.sidebarStatusList.innerHTML;
+          if (currentContent !== content) {
+            el.sidebarStatusList.innerHTML = content;
+            
+            // Bind cancel buttons
+            el.sidebarStatusList.querySelectorAll('[data-cancel]')?.forEach((btn) => {
+              btn.addEventListener('click', () => {
+                queue.cancel(btn.getAttribute('data-cancel'));
+              });
             });
-          });
+          }
         }
         
         // Update active downloads status
@@ -825,7 +961,15 @@
     
     async updateActiveCount() {
       try {
-        const d = await utils.j(API.activeDownloads);
+        // Use cache to avoid redundant requests
+        let d;
+        if (apiCache.isValid('activeDownloads')) {
+          d = apiCache.get('activeDownloads');
+        } else {
+          d = await utils.j(API.activeDownloads);
+          apiCache.set('activeDownloads', d);
+        }
+        
         console.log('Active downloads data:', d);
         const n = Array.isArray(d.active_downloads) ? d.active_downloads.length : 0;
         if (el.sidebarActiveDownloadsCount) el.sidebarActiveDownloadsCount.textContent = `Active: ${n}`;
@@ -839,18 +983,19 @@
     updateBadge() {
       if (!el.sidebarBadge) return;
       
-      // Count active downloads by looking at the text content in the sidebar
-      const downloadingItems = Array.from(el.sidebarStatusList?.querySelectorAll('li') || [])
-        .filter(li => li.textContent.includes('downloading') || li.textContent.includes('queued'));
+      // Count ONLY real items (exclude optimistic items to avoid double counting)
+      const realItems = Array.from(el.sidebarStatusList?.querySelectorAll('li') || [])
+        .filter(li => !li.hasAttribute('data-optimistic-id') &&
+          (li.textContent.includes('downloading') || li.textContent.includes('queued')));
       
-      // Add optimistic items to the count
-      const totalCount = downloadingItems.length + this.optimisticItems.size;
+      // Add optimistic items to the count (they're not in the DOM yet)
+      const totalCount = realItems.length + this.optimisticItems.size;
       
       const hasError = Array.from(el.sidebarStatusList?.querySelectorAll('li') || [])
-        .some(li => li.textContent.includes('error'));
+        .some(li => !li.hasAttribute('data-optimistic-id') && li.textContent.includes('error'));
       
       const hasDownloading = Array.from(el.sidebarStatusList?.querySelectorAll('li') || [])
-        .some(li => li.textContent.includes('downloading'));
+        .some(li => !li.hasAttribute('data-optimistic-id') && li.textContent.includes('downloading'));
       
       if (totalCount > 0) {
         el.sidebarBadge.textContent = totalCount;

@@ -139,12 +139,23 @@ def search_books(query: str, filters: SearchFilters) -> List[BookInfo]:
 def _parse_search_result_row(row: Tag) -> Optional[BookInfo]:
     """Parse a single search result row into a BookInfo object."""
     try:
+        # Filtrer rapidement les lignes de publicité pour éviter le bruit dans les logs
+        row_class = row.get('class', [])
+        if isinstance(row_class, list):
+            row_class_str = ' '.join(row_class)
+        else:
+            row_class_str = str(row_class)
+            
+        if 'aa-logged-in' in row_class_str or 'ad' in row_class_str.lower():
+            # Ignorer silencieusement les lignes de publicité
+            return None
+            
         cells = row.find_all("td")
         
         # Validation du nombre de cellules attendues (minimum 11 pour les indices utilisés)
         expected_min_cells = 11
         if len(cells) < expected_min_cells:
-            logger.warning(f"Invalid table row structure: expected at least {expected_min_cells} cells, got {len(cells)}. Row content: {str(row)[:200]}...")
+            logger.debug(f"Invalid table row structure: expected at least {expected_min_cells} cells, got {len(cells)}. Row content: {str(row)[:200]}...")
             return None
         
         # Validation des liens pour l'ID
@@ -159,10 +170,17 @@ def _parse_search_result_row(row: Tag) -> Optional[BookInfo]:
                 logger.warning(f"Cell index {index} out of range for field '{field_name}'. Total cells: {len(cells)}")
                 return None
             span = cells[index].find("span")
-            if not span or not span.next:
-                logger.warning(f"No span or span content found for field '{field_name}' at index {index}")
+            if not span:
+                logger.warning(f"No span found for field '{field_name}' at index {index}")
                 return None
-            return span.next
+            
+            # Utiliser get_text pour garantir une chaîne de caractères
+            text = span.get_text(strip=True)
+            if not text:
+                logger.warning(f"Empty text content for field '{field_name}' at index {index}")
+                return None
+            
+            return text
         
         # Extraction sécurisée de l'ID
         book_id = links[0]["href"].split("/")[-1]
@@ -423,7 +441,7 @@ def _parse_book_info_page(soup: BeautifulSoup, book_id: str) -> BookInfo:
 
 def _get_download_urls_from_welib(book_id: str) -> set[str]:
     """Get download urls from welib.org."""
-    if ALLOW_USE_WELIB == False:
+    if not ALLOW_USE_WELIB:
         logger.debug("WELIB usage is disabled")
         return set()
     
@@ -600,7 +618,7 @@ def download_book(book_info: BookInfo, book_path: Path, progress_callback: Optio
     return False
 
 
-def _get_download_url(link: str, title: str, cancel_flag: Optional[Event] = None) -> str:
+def _get_download_url(link: str, title: str, cancel_flag: Optional[Event] = None, max_retries: int = 3) -> str:
     """Extract actual download URL from various source pages."""
     logger.debug(f"Extracting download URL from: {link}")
     url = ""
@@ -641,13 +659,18 @@ def _get_download_url(link: str, title: str, cancel_flag: Optional[Event] = None
                 if not download_links:
                     countdown = soup.find_all("span", class_="js-partner-countdown")
                     if countdown:
+                        # Vérifier la limite de tentatives pour éviter la récursion infinie
+                        if max_retries <= 0:
+                            logger.warning(f"Max retries reached for {title} - giving up")
+                            return ""
+                        
                         try:
                             sleep_time = int(countdown[0].text)
-                            logger.info(f"Waiting {sleep_time}s for {title}")
+                            logger.info(f"Waiting {sleep_time}s for {title} (retries left: {max_retries})")
                             if cancel_flag is not None and cancel_flag.wait(timeout=sleep_time):
                                 logger.info(f"Cancelled wait for {title}")
                                 return ""
-                            url = _get_download_url(link, title, cancel_flag)
+                            url = _get_download_url(link, title, cancel_flag, max_retries - 1)
                         except (ValueError, IndexError) as e:
                             logger.warning(f"Invalid countdown value for {title}: {e}")
                     else:
