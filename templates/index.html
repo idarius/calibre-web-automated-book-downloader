@@ -20,7 +20,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <img src="{{ url_for('static', filename='media/logo.png') }}" alt="Logo" class="h-8 w-8">
-                <h1 class="text-lg font-semibold">Book Search & Download x</h1>
+                <h1 class="text-lg font-semibold">Book Search & Download</h1>
             </div>
             <div class="flex items-center gap-2">
                 {% if debug %}
@@ -35,6 +35,16 @@
                     </button>
                 </form>
                 {% endif %}
+
+                <!-- Sidebar Toggle Button -->
+                <div class="relative">
+                    <button id="sidebar-toggle" class="px-3 py-1 rounded border text-sm relative" style="border-color: var(--border-muted);">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                        </svg>
+                        <span id="sidebar-badge" class="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center hidden">0</span>
+                    </button>
+                </div>
 
                 <!-- Theme Dropdown -->
                 <div class="relative">
@@ -55,6 +65,39 @@
     </header>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <!-- Sidebar Panel -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden"></div>
+        <div id="sidebar-panel" class="fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-gray-800 shadow-xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out">
+            <div class="h-full flex flex-col" style="background: var(--bg-soft);">
+                <!-- Sidebar Header -->
+                <div class="flex items-center justify-between p-4 border-b" style="border-color: var(--border-muted);">
+                    <h2 class="text-lg font-semibold">Download Queue & Status</h2>
+                    <button id="sidebar-close" class="p-1 rounded hover:bg-black/10">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- Sidebar Content -->
+                <div class="flex-1 overflow-y-auto p-4">
+                    <div id="sidebar-status-loading" class="text-sm opacity-80 hidden">Loading…</div>
+                    <div id="sidebar-status-list" class="space-y-2"></div>
+                    <div id="sidebar-no-results" class="text-sm opacity-80 hidden">No downloads.</div>
+                </div>
+                
+                <!-- Sidebar Footer -->
+                <div class="p-4 border-t" style="border-color: var(--border-muted);">
+                    <div class="flex items-center gap-2">
+                        <button id="sidebar-refresh-button" class="px-3 py-1 rounded border text-sm flex-1" style="border-color: var(--border-muted);">Refresh</button>
+                        <button id="sidebar-clear-completed-button" class="px-3 py-1 rounded border text-sm flex-1" style="border-color: var(--border-muted);">Clear Completed</button>
+                    </div>
+                    <div class="mt-2 text-xs opacity-60 text-center">
+                        <span id="sidebar-active-downloads-count">Active: 0</span> • Auto-refresh: 7s
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- Hero / Search -->
         <section class="mb-6">
             <div class="flex flex-col gap-3">
@@ -201,19 +244,6 @@
             <div class="details-container" id="details-container"></div>
         </div>
 
-        <!-- Status -->
-        <section>
-            <div class="flex items-center flex-wrap mb-3">
-                <h2 class="text-xl font-semibold mr-4 sm:mr-6">Download Queue & Status</h2>
-                <div class="flex items-center gap-3 ml-4 sm:ml-auto">
-                    <button id="refresh-status-button" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">Refresh</button>
-                    <button id="clear-completed-button" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">Clear Completed</button>
-                    <span id="active-downloads-count" class="text-sm opacity-80">Active: 0</span>
-                </div>
-            </div>
-            <div id="status-loading" class="text-sm opacity-80 hidden">Loading…</div>
-            <div id="status-list" class="space-y-2"></div>
-        </section>
     </main>
 
     <footer class="mt-10 border-t pt-6 pb-10" style="border-color: var(--border-muted); background: var(--footer-bg);">
