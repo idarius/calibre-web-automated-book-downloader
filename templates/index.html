@@ -231,8 +231,61 @@
             <div id="active-downloads-list" class="space-y-2"></div>
         </section>
 
+        <!-- Home Content Sections -->
+        <section class="mb-8" id="home-sections">
+            <!-- Recent Downloads -->
+            <div class="mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold">Recent Downloads</h2>
+                    <button id="refresh-recent" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+                <div id="recent-downloads-loading" class="text-sm opacity-80 hidden">Loading…</div>
+                <div id="recent-downloads-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    <!-- Recent download cards will be injected here -->
+                </div>
+                <div id="no-recent-downloads" class="text-sm opacity-80 hidden">No recent downloads.</div>
+            </div>
+
+            <!-- Popular Books -->
+            <div class="mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold">Popular This Month</h2>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center border rounded" style="border-color: var(--border-muted);" id="popular-view-toggle-container">
+                            <button id="popular-view-grid" class="px-2 py-1 text-sm view-toggle active" title="Vue grille" data-view="grid">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                </svg>
+                            </button>
+                            <button id="popular-view-list" class="px-2 py-1 text-sm view-toggle" title="Vue liste" data-view="list">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                            </button>
+                        </div>
+                        <button id="refresh-popular" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+                <div id="popular-books-loading" class="text-sm opacity-80 hidden">Loading…</div>
+                <div id="popular-books-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Popular book cards will be injected here -->
+                </div>
+                <div id="no-popular-books" class="text-sm opacity-80 hidden">No popular books available.</div>
+            </div>
+        </section>
+
         <!-- Results -->
-        <section class="mb-8">
+        <section class="mb-8" id="search-section">
             <div class="flex items-center justify-between mb-3">
                 <h2 class="text-xl font-semibold">Search Results</h2>
                 <div class="flex items-center gap-3">

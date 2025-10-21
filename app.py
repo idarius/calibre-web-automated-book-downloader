@@ -456,6 +456,31 @@ def api_clear_completed() -> Union[Response, Tuple[Response, int]]:
         logger.error_trace(f"Clear completed error: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/popular', methods=['GET'])
+@login_required
+def api_popular() -> Union[Response, Tuple[Response, int]]:
+    """
+    Get popular books based on Apple Books bestsellers.
+
+    Query Parameters:
+        limit (int): Maximum number of books to return (default: 12)
+
+    Returns:
+        flask.Response: JSON array of popular books or error response.
+    """
+    try:
+        limit = int(request.args.get('limit', 12))
+        # Limit to reasonable range
+        limit = min(max(limit, 1), 50)
+        
+        books = backend.get_popular_books(limit)
+        return jsonify(books)
+    except ValueError:
+        return jsonify({"error": "Invalid limit parameter"}), 400
+    except Exception as e:
+        logger.error_trace(f"Popular books error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.errorhandler(404)
 def not_found_error(error: Exception) -> Union[Response, Tuple[Response, int]]:
     """

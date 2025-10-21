@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 import subprocess
 import os
+import json
+import requests
 from concurrent.futures import ThreadPoolExecutor, Future
 from threading import Event
 
@@ -266,6 +268,83 @@ def get_active_downloads() -> List[str]:
 def clear_completed() -> int:
     """Clear all completed downloads from tracking."""
     return book_queue.clear_completed()
+
+def fetch_apple_books_rss() -> List[Dict[str, Any]]:
+    """Fetch popular books from Apple Books RSS feed.
+    
+    Returns:
+        List[Dict]: List of popular books from Apple Books
+    """
+    try:
+        url = "https://rss.marketingtools.apple.com/api/v2/fr/books/top-paid/50/books.json"
+        logger.info(f"Fetching popular books from Apple Books RSS: {url}")
+        
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        # La structure correcte est data.feed.results, pas data.books
+        books = data.get('feed', {}).get('results', [])
+        
+        logger.info(f"Successfully fetched {len(books)} popular books from Apple Books")
+        return books
+        
+    except requests.RequestException as e:
+        logger.error_trace(f"Error fetching Apple Books RSS: {e}")
+        return []
+    except json.JSONDecodeError as e:
+        logger.error_trace(f"Error parsing Apple Books RSS JSON: {e}")
+        return []
+    except Exception as e:
+        logger.error_trace(f"Unexpected error fetching Apple Books RSS: {e}")
+        return []
+
+def get_popular_books(limit: int = 12) -> List[Dict[str, Any]]:
+    """Get popular books from Apple Books RSS feed.
+    
+    Args:
+        limit: Maximum number of books to return
+        
+    Returns:
+        List[Dict]: List of popular books from Apple Books
+    """
+    try:
+        # Fetch popular books from Apple Books RSS
+        apple_books = fetch_apple_books_rss()
+        if not apple_books:
+            logger.warning("No popular books fetched from Apple Books RSS")
+            return []
+        
+        # Transform Apple Books data to our format
+        popular_books = []
+        for apple_book in apple_books[:limit]:
+            title = apple_book.get('name', '').strip()
+            author = apple_book.get('artistName', '').strip()
+            cover_url = apple_book.get('artworkUrl100', '').strip()
+            
+            if not title:
+                continue
+                
+            # Create a book object in our format
+            book_data = {
+                'id': apple_book.get('id', ''),
+                'title': title,
+                'author': author,
+                'preview': cover_url,
+                'url': apple_book.get('url', ''),
+                'releaseDate': apple_book.get('releaseDate', ''),
+                'genres': [genre.get('name', '') for genre in apple_book.get('genres', [])],
+                'isAppleBook': True  # Flag to identify Apple Books
+            }
+            
+            popular_books.append(book_data)
+        
+        logger.info(f"Returning {len(popular_books)} popular books from Apple Books")
+        return popular_books
+        
+    except Exception as e:
+        logger.error_trace(f"Error in get_popular_books: {e}")
+        return []
 
 def _process_single_download(book_id: str, cancel_flag: Event) -> None:
     """Process a single download job."""

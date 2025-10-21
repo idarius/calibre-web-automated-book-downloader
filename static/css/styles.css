@@ -192,9 +192,14 @@ header::before {
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3) !important;
 }
 
-[data-theme="dark"] header::before {
-    background: rgba(0, 0, 0, 0.95) !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+/* THEME DARK - HEADER NOIR FIXE (override absolu) */
+[data-theme="dark"] header,
+[data-theme="dark"] header::before,
+[data-theme="dark"] header.scrolled,
+[data-theme="dark"] header.scrolled::before,
+[data-theme="dark"] header:hover,
+[data-theme="dark"] header:hover::before {
+    background: #000000 !important;
 }
 
 [data-theme="light"] header::before {
@@ -1034,6 +1039,27 @@ h1, h2, h3, h4, h5, h6,
     will-change: auto;
 }
 
+/* Apple Books specific styles */
+.apple-book-card {
+  border: 2px solid rgba(0, 122, 255, 0.3);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.apple-book-card:hover {
+  border-color: rgba(0, 122, 255, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.2);
+}
+
+.apple-book-card .mini-cover {
+  transition: transform 0.2s ease;
+}
+
+.apple-book-card:hover .mini-cover {
+  transform: scale(1.05);
+}
+
 /* Smooth transitions for sidebar - Optimized performance */
 #sidebar-panel {
     /* will-change applied dynamically when needed */
@@ -1339,6 +1365,113 @@ button:disabled {
 [data-theme="dark"] .book-cover:hover,
 [data-theme="dark-blue"] .book-cover:hover {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Home Sections Styles */
+.mini-book-card {
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.mini-book-card:hover {
+    transform: translateY(-2px);
+}
+
+.mini-cover {
+    transition: opacity 0.2s ease;
+}
+
+.mini-cover:hover {
+    opacity: 0.9;
+}
+
+/* Line clamp utilities */
+.line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+}
+
+.line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* Home section headers */
+#home-sections h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Refresh button styling */
+#refresh-recent, #refresh-popular {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+#refresh-recent:hover, #refresh-popular:hover {
+    background: var(--bg-hover);
+}
+
+/* Loading states for home sections */
+#recent-downloads-loading, #popular-books-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+/* Responsive adjustments for home sections */
+@media (max-width: 640px) {
+    #recent-downloads-grid, #popular-books-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+    
+    .mini-book-card h4 {
+        font-size: 0.75rem;
+    }
+    
+    .mini-book-card p {
+        font-size: 0.625rem;
+    }
+}
+
+@media (max-width: 480px) {
+    #recent-downloads-grid, #popular-books-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Animations for status messages */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
 }
 
 /* Smooth transitions for table rows */

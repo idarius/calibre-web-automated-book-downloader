@@ -164,6 +164,19 @@
     viewToggleContainer: document.getElementById('view-toggle-container'),
     viewGridBtn: document.getElementById('view-grid'),
     viewListBtn: document.getElementById('view-list'),
+    // Home sections elements
+    homeSections: document.getElementById('home-sections'),
+    recentDownloadsGrid: document.getElementById('recent-downloads-grid'),
+    recentDownloadsLoading: document.getElementById('recent-downloads-loading'),
+    noRecentDownloads: document.getElementById('no-recent-downloads'),
+    refreshRecentBtn: document.getElementById('refresh-recent'),
+    popularBooksContainer: document.getElementById('popular-books-container'),
+    popularBooksLoading: document.getElementById('popular-books-loading'),
+    noPopularBooks: document.getElementById('no-popular-books'),
+    refreshPopularBtn: document.getElementById('refresh-popular'),
+    popularViewGridBtn: document.getElementById('popular-view-grid'),
+    popularViewListBtn: document.getElementById('popular-view-list'),
+    popularViewToggleContainer: document.getElementById('popular-view-toggle-container'),
     // Sidebar elements
     sidebarToggle: document.getElementById('sidebar-toggle'),
     sidebarBadge: document.getElementById('sidebar-badge'),
@@ -187,7 +200,8 @@
     cancelDownload: '/request/api/download',
     setPriority: '/request/api/queue',
     clearCompleted: '/request/api/queue/clear',
-    activeDownloads: '/request/api/downloads/active'
+    activeDownloads: '/request/api/downloads/active',
+    popular: '/request/api/popular'
   };
   const FILTERS = ['isbn', 'author', 'title', 'lang', 'sort', 'content', 'format'];
   const SIDEBAR_REFRESH_INTERVAL = 10000; // 10 seconds to reduce server load
@@ -346,27 +360,35 @@
 
   // ---- Cards ----
   function renderCard(book) {
+    const isAppleBook = book.isAppleBook || false;
+    
     const cover = book.preview ? `<img src="${utils.e(book.preview)}" alt="Cover" class="w-full h-88 object-cover rounded">` :
       `<div class="w-full h-88 rounded flex items-center justify-center opacity-70" style="background: var(--bg-soft)">No Cover</div>`;
 
+    // Pour les livres Apple Books, utiliser les informations disponibles
+    const year = book.year || book.releaseDate || '-';
+    const language = book.language || '-';
+    const format = book.format || '-';
+    const size = book.size || '';
+
     const html = `
-      <article class="rounded border p-3 flex flex-col gap-3" style="border-color: var(--border-muted); background: var(--bg-soft)">
+      <article class="rounded border p-3 flex flex-col gap-3 ${isAppleBook ? 'apple-book-card' : ''}" style="border-color: var(--border-muted); background: var(--bg-soft)">
         ${cover}
         <div class="flex-1 space-y-1">
           <h3 class="font-semibold leading-tight">${utils.e(book.title) || 'Untitled'}</h3>
           <p class="text-sm opacity-80">${utils.e(book.author) || 'Unknown author'}</p>
           <div class="text-xs opacity-70 flex flex-wrap gap-2">
-            <span>${utils.e(book.year) || '-'}</span>
+            <span>${utils.e(year)}</span>
             <span>•</span>
-            <span>${utils.e(book.language) || '-'}</span>
+            <span>${utils.e(language)}</span>
             <span>•</span>
-            <span>${utils.e(book.format) || '-'}</span>
-            ${book.size ? `<span>•</span><span>${utils.e(book.size)}</span>` : ''}
+            <span>${utils.e(format)}</span>
+            ${size ? `<span>•</span><span>${utils.e(size)}</span>` : ''}
           </div>
         </div>
         <div class="flex gap-2">
-          <button class="px-3 py-2 rounded border text-sm flex-1" data-action="details" data-id="${utils.e(book.id)}" style="border-color: var(--border-muted);">Details</button>
-          <button class="px-3 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm flex-1" data-action="download" data-id="${utils.e(book.id)}">Download</button>
+          <button class="px-3 py-2 rounded border text-sm flex-1" data-action="${isAppleBook ? 'search' : 'details'}" data-id="${utils.e(book.id)}" data-title="${utils.e(book.title)}" style="border-color: var(--border-muted);">${isAppleBook ? 'Search' : 'Details'}</button>
+          ${!isAppleBook ? `<button class="px-3 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm flex-1" data-action="download" data-id="${utils.e(book.id)}">Download</button>` : ''}
         </div>
       </article>`;
 
@@ -374,9 +396,23 @@
     wrapper.innerHTML = html;
     // Bind actions
     const detailsBtn = wrapper.querySelector('[data-action="details"]');
+    const searchBtn = wrapper.querySelector('[data-action="search"]');
     const downloadBtn = wrapper.querySelector('[data-action="download"]');
-    detailsBtn?.addEventListener('click', () => bookDetails.show(book.id));
-    downloadBtn?.addEventListener('click', () => bookDetails.download(book));
+    
+    if (detailsBtn) {
+      detailsBtn.addEventListener('click', () => bookDetails.show(book.id));
+    }
+    
+    if (searchBtn) {
+      searchBtn.addEventListener('click', () => {
+        homeSections.searchForAppleBook(book.title);
+      });
+    }
+    
+    if (downloadBtn) {
+      downloadBtn.addEventListener('click', () => bookDetails.download(book));
+    }
+    
     return wrapper.firstElementChild;
   }
 
@@ -460,6 +496,19 @@
       } else {
         return words[0] || 'Unknown author';
       }
+    };
+    
+    // Fonction pour nettoyer les dates (prendre seulement la première année)
+    const cleanYear = (year) => {
+      if (!year) return '-';
+      
+      // Si l'année contient plusieurs années concaténées, prendre la première
+      const yearMatch = year.match(/(\d{4})/);
+      if (yearMatch) {
+        return yearMatch[1];
+      }
+      
+      return year;
     };
     
     // Cellule Preview
@@ -1039,7 +1088,7 @@
       
       // Bind sidebar buttons
       el.sidebarRefreshBtn?.addEventListener('click', () => {
-        this.fetchStatus(true); // Show loader for manual refresh
+        this.fetchStatus(true, true); // Show loader for manual refresh et force refresh
       });
       
       el.sidebarClearCompletedBtn?.addEventListener('click', async () => {
@@ -1151,7 +1200,7 @@
       }
     },
     
-    async fetchStatus(showLoader = false) {
+    async fetchStatus(showLoader = false, forceRefresh = false) {
       // Prevent multiple simultaneous requests
       if (this.isFetching) return;
       
@@ -1163,18 +1212,39 @@
           utils.show(el.sidebarStatusLoading);
         }
         
-        // Check cache first to avoid redundant requests
+        // Check cache first to avoid redundant requests (sauf si forceRefresh)
         let data;
-        if (apiCache.isValid('status')) {
+        if (!forceRefresh && apiCache.isValid('status')) {
           data = apiCache.get('status');
           console.log('Using cached status data');
         } else {
-          // Add a small delay to prevent flicker for fast responses
-          const fetchPromise = utils.j(API.status);
-          const minDelayPromise = new Promise(resolve => setTimeout(resolve, 300));
+          // Forcer le rafraîchissement si demandé
+          if (forceRefresh) {
+            console.log('Force refreshing status data (bypassing cache)');
+            apiCache.invalidate('status');
+          }
           
-          [data] = await Promise.all([fetchPromise, minDelayPromise]);
-          apiCache.set('status', data);
+          try {
+            // Add a small delay to prevent flicker for fast responses
+            const fetchPromise = utils.j(API.status);
+            const minDelayPromise = new Promise(resolve => setTimeout(resolve, 300));
+            
+            [data] = await Promise.all([fetchPromise, minDelayPromise]);
+            apiCache.set('status', data);
+          } catch (fetchError) {
+            console.error('Error fetching status:', fetchError);
+            
+            // En cas d'erreur, utiliser les données en cache si disponibles
+            if (apiCache.isValid('status')) {
+              console.log('Using cached data due to fetch error');
+              data = apiCache.get('status');
+              
+              // Afficher un message d'erreur plus subtil
+              this.showErrorState('Using cached data. Refresh failed.', true);
+            } else {
+              throw fetchError;
+            }
+          }
         }
         
         // Debug logging
@@ -1234,29 +1304,46 @@
       }
     },
     
-    showErrorState(message) {
+    showErrorState(message, showSubtle = false) {
       if (el.sidebarStatusList) {
-        // Check if we have optimistic items to preserve
-        const hasOptimisticItems = this.optimisticItems.size > 0;
+        // Toujours préserver le contenu existant et ajouter un message subtil
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'status-message text-xs p-2 rounded mb-2';
+        errorDiv.style.cssText = `
+          background: ${showSubtle ? 'rgba(255, 193, 7, 0.1)' : 'rgba(239, 68, 68, 0.1)'};
+          border: 1px solid ${showSubtle ? 'rgba(255, 193, 7, 0.3)' : 'rgba(239, 68, 68, 0.3)'};
+          color: ${showSubtle ? 'rgba(255, 193, 7, 0.9)' : 'rgba(239, 68, 68, 0.9)'};
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          animation: slideDown 0.3s ease;
+        `;
         
-        if (hasOptimisticItems) {
-          // Show error message but preserve optimistic items
-          const errorDiv = document.createElement('div');
-          errorDiv.className = 'error-message text-sm opacity-80 p-2 border border-red-300 rounded mb-2 bg-red-50 dark:bg-red-900/20';
-          errorDiv.textContent = message;
-          
-          // Insert error at the top
-          if (el.sidebarStatusList.firstChild) {
-            el.sidebarStatusList.insertBefore(errorDiv, el.sidebarStatusList.firstChild);
-          } else {
-            el.sidebarStatusList.appendChild(errorDiv);
-          }
+        errorDiv.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>${message}</span>
+        `;
+        
+        // Ajouter au début de la liste
+        if (el.sidebarStatusList.firstChild) {
+          el.sidebarStatusList.insertBefore(errorDiv, el.sidebarStatusList.firstChild);
         } else {
-          // Show full error message
-          if (el.sidebarStatusList) {
-            el.sidebarStatusList.innerHTML = `<div class="error-message text-sm opacity-80 p-3 border border-red-300 rounded bg-red-50 dark:bg-red-900/20">${message}</div>`;
-          }
+          el.sidebarStatusList.appendChild(errorDiv);
         }
+        
+        // Auto-supprimer après 5 secondes
+        setTimeout(() => {
+          if (errorDiv.parentNode) {
+            errorDiv.style.animation = 'slideUp 0.3s ease';
+            setTimeout(() => {
+              if (errorDiv.parentNode) {
+                errorDiv.parentNode.removeChild(errorDiv);
+              }
+            }, 300);
+          }
+        }, 5000);
       }
     },
     
@@ -1696,21 +1783,97 @@
     }
 
     el.refreshStatusBtn?.addEventListener('click', () => {
+      // Feedback immédiat
+      el.refreshStatusBtn.disabled = true;
+      el.refreshStatusBtn.style.opacity = '0.6';
+      
       // Don't fetch status automatically on page load to reduce unnecessary requests
       // Users can manually refresh when needed
-      // status.fetch();
-      sidebar.fetchStatus(); // Also update sidebar
+      const fetchPromise = sidebar.fetchStatus(false, true); // Force refresh
+      
+      // Réactiver le bouton après le chargement
+      fetchPromise.finally(() => {
+        el.refreshStatusBtn.disabled = false;
+        el.refreshStatusBtn.style.opacity = '1';
+      });
     });
     el.activeTopRefreshBtn?.addEventListener('click', () => {
-      status.fetch();
-      sidebar.fetchStatus(); // Also update sidebar
+      // Feedback immédiat
+      el.activeTopRefreshBtn.disabled = true;
+      el.activeTopRefreshBtn.style.opacity = '0.6';
+      
+      const fetchPromise = Promise.all([
+        status.fetch(),
+        sidebar.fetchStatus(false, true) // Force refresh
+      ]);
+      
+      // Réactiver le bouton après le chargement
+      fetchPromise.finally(() => {
+        el.activeTopRefreshBtn.disabled = false;
+        el.activeTopRefreshBtn.style.opacity = '1';
+      });
     });
     el.clearCompletedBtn?.addEventListener('click', async () => {
+      // Feedback immédiat
+      el.clearCompletedBtn.disabled = true;
+      el.clearCompletedBtn.style.opacity = '0.6';
+      
       try {
+        // Supprimer immédiatement les éléments terminés de l'interface
+        const completedItems = document.querySelectorAll('[data-status="done"]');
+        completedItems.forEach(item => {
+          // Animation de disparition
+          item.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+          item.style.opacity = '0';
+          item.style.transform = 'translateX(20px)';
+          
+          // Supprimer après l'animation
+          setTimeout(() => {
+            if (item.parentNode) {
+              item.parentNode.removeChild(item);
+            }
+          }, 300);
+        });
+        
+        // Mettre à jour le compteur
+        const activeCount = document.getElementById('active-downloads-count');
+        const sidebarActiveCount = document.getElementById('sidebar-active-downloads-count');
+        if (activeCount) {
+          const currentCount = parseInt(activeCount.textContent) || 0;
+          const newCount = Math.max(0, currentCount - completedItems.length);
+          activeCount.textContent = newCount;
+        }
+        if (sidebarActiveCount) {
+          const currentCount = parseInt(sidebarActiveCount.textContent) || 0;
+          const newCount = Math.max(0, currentCount - completedItems.length);
+          sidebarActiveCount.textContent = newCount;
+        }
+        
+        // Ensuite faire l'appel API
         await fetch(API.clearCompleted, { method: 'DELETE' });
-        status.fetch();
-        sidebar.fetchStatus(); // Also update sidebar
-      } catch (_) {}
+        
+        // Rafraîchir les données pour s'assurer que tout est synchronisé
+        const fetchPromise = Promise.all([
+          status.fetch(),
+          sidebar.fetchStatus(false, true) // Force refresh
+        ]);
+        
+        // Réactiver le bouton après le chargement
+        fetchPromise.finally(() => {
+          el.clearCompletedBtn.disabled = false;
+          el.clearCompletedBtn.style.opacity = '1';
+        });
+      } catch (e) {
+        // En cas d'erreur, réactiver immédiatement et rafraîchir
+        el.clearCompletedBtn.disabled = false;
+        el.clearCompletedBtn.style.opacity = '1';
+        
+        // Rafraîchir pour restaurer l'état correct
+        Promise.all([
+          status.fetch(),
+          sidebar.fetchStatus(false, true)
+        ]);
+      }
     });
 
     // Close modal on overlay click
@@ -1873,8 +2036,8 @@
         if (thumbnailImg) {
           const rect = thumbnailImg.getBoundingClientRect();
           
-          // Animer vers la position de la miniature (plus rapide et plus réactive)
-          zoomedImage.style.transition = 'all 0.2s cubic-bezier(0.55, 0.055, 0.675, 0.19)';
+          // Animer vers la position de la miniature (symétrique à l'ouverture)
+          zoomedImage.style.transition = 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
           zoomedImage.style.left = `${rect.left}px`;
           zoomedImage.style.top = `${rect.top}px`;
           zoomedImage.style.width = `${rect.width}px`;
@@ -1893,7 +2056,7 @@
             this.currentZoomedImage = null;
             this.currentBackdrop = null;
             this.isAnimating = false;
-          }, 200);
+          }, 300);
         } else {
           // Si on ne trouve pas la miniature, juste disparaître (plus rapide)
           zoomedImage.style.transition = 'opacity 0.15s ease';
@@ -1921,11 +2084,382 @@
     // Pas besoin de gestionnaires globaux, tout est géré par coverZoomManager
   }
 
+  // ---- Home Sections ----
+  const homeSections = {
+    async fetchRecentDownloads() {
+      try {
+        console.log('Fetching recent downloads...');
+        utils.show(el.recentDownloadsLoading);
+        
+        // Récupérer les livres récemment téléchargés (disponibles)
+        const status = await utils.j(API.status);
+        console.log('Status data:', status);
+        const recentBooks = status.available ? Object.values(status.available).slice(0, 12) : [];
+        console.log('Recent books:', recentBooks);
+        
+        utils.hide(el.recentDownloadsLoading);
+        this.renderRecentDownloads(recentBooks);
+      } catch (e) {
+        console.error('Error fetching recent downloads:', e);
+        utils.hide(el.recentDownloadsLoading);
+        utils.show(el.noRecentDownloads);
+      }
+    },
+    
+    renderRecentDownloads(books) {
+      el.recentDownloadsGrid.innerHTML = '';
+      if (!books || books.length === 0) {
+        utils.show(el.noRecentDownloads);
+        return;
+      }
+      utils.hide(el.noRecentDownloads);
+      
+      const frag = document.createDocumentFragment();
+      books.forEach((book) => {
+        const card = this.createMiniCard(book);
+        frag.appendChild(card);
+      });
+      el.recentDownloadsGrid.appendChild(frag);
+    },
+    
+    async fetchPopularBooks() {
+      try {
+        console.log('Fetching popular books...');
+        utils.show(el.popularBooksLoading);
+        
+        // Utiliser le nouvel endpoint API pour les livres populaires
+        const popularBooks = await utils.j(`${API.popular}?limit=12`);
+        console.log('Popular books from API:', popularBooks);
+        
+        // Stocker les résultats pour le changement de vue
+        window.lastPopularResults = popularBooks;
+        
+        utils.hide(el.popularBooksLoading);
+        this.renderPopularBooks(popularBooks);
+      } catch (e) {
+        console.error('Error fetching popular books:', e);
+        utils.hide(el.popularBooksLoading);
+        utils.show(el.noPopularBooks);
+        
+        // Afficher un message plus spécifique en cas d'erreur
+        if (el.noPopularBooks) {
+          if (e.message && e.message.includes('404')) {
+            el.noPopularBooks.innerHTML = 'Popular books feature not available. Please check back later.';
+          } else if (e.message && e.message.includes('timeout')) {
+            el.noPopularBooks.innerHTML = 'Request timeout. Please try again.';
+          } else {
+            el.noPopularBooks.innerHTML = 'Unable to load popular books. Please try again later.';
+          }
+        }
+      }
+    },
+    
+    renderPopularBooks(books) {
+      el.popularBooksContainer.innerHTML = '';
+      if (!books || books.length === 0) {
+        utils.show(el.noPopularBooks);
+        return;
+      }
+      utils.hide(el.noPopularBooks);
+      
+      // Utiliser les mêmes fonctions de rendu que la recherche
+      this.renderPopularResults(books);
+    },
+    
+    renderPopularResults(books) {
+      // Utiliser la vue actuelle (grille par défaut)
+      const currentView = this.getPopularViewMode();
+      
+      if (currentView === VIEW_MODES.GRID) {
+        this.renderPopularGrid(books);
+      } else {
+        this.renderPopularList(books);
+      }
+    },
+    
+    getPopularViewMode() {
+      // Récupérer la vue actuelle depuis les boutons
+      const activeBtn = el.popularViewToggleContainer?.querySelector('.view-toggle.active');
+      return activeBtn?.getAttribute('data-view') || VIEW_MODES.GRID;
+    },
+    
+    renderPopularGrid(books) {
+      el.popularBooksContainer.innerHTML = '';
+      if (!books || books.length === 0) {
+        utils.show(el.noPopularBooks);
+        return;
+      }
+      utils.hide(el.noPopularBooks);
+      
+      // Configurer le conteneur pour la vue grille
+      el.popularBooksContainer.classList.remove('list-view');
+      el.popularBooksContainer.classList.add('grid-view');
+      
+      const frag = document.createDocumentFragment();
+      books.forEach((book) => {
+        const card = renderCard(book);
+        frag.appendChild(card);
+      });
+      el.popularBooksContainer.appendChild(frag);
+    },
+    
+    renderPopularList(books) {
+      el.popularBooksContainer.innerHTML = '';
+      if (!books || books.length === 0) {
+        utils.show(el.noPopularBooks);
+        return;
+      }
+      utils.hide(el.noPopularBooks);
+      
+      // Configurer le conteneur pour la vue liste
+      el.popularBooksContainer.classList.remove('grid-view');
+      el.popularBooksContainer.classList.add('list-view');
+      
+      // Créer la structure du tableau
+      const table = document.createElement('div');
+      table.className = 'overflow-x-auto';
+      table.innerHTML = `
+        <table class="w-full border-collapse" style="border-color: var(--border-muted);">
+          <thead>
+            <tr style="background: var(--bg-soft);">
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Preview</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Title</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Author</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Publisher</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Year</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Language</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Format</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Size</th>
+              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="popular-results-tbody">
+            <!-- Les lignes seront injectées ici -->
+          </tbody>
+        </table>
+      `;
+      
+      el.popularBooksContainer.appendChild(table);
+      const tbody = document.getElementById('popular-results-tbody');
+      
+      // Ajouter chaque livre comme une ligne séparée
+      books.forEach((book) => {
+        const row = this.createPopularListItem(book);
+        tbody.appendChild(row);
+      });
+    },
+    
+    createPopularListItem(book) {
+      const isAppleBook = book.isAppleBook || false;
+      
+      // Fonctions utilitaires pour nettoyer les données
+      const cleanAuthor = (author) => {
+        if (!author) return 'Unknown author';
+        return author.length > 30 ? author.substring(0, 30) + '...' : author;
+      };
+      
+      const cleanYear = (year) => {
+        if (!year) return '-';
+        const yearMatch = year.match(/(\d{4})/);
+        return yearMatch ? yearMatch[1] : year;
+      };
+      
+      // Cellule Preview
+      const previewCell = document.createElement('td');
+      previewCell.className = 'p-3';
+      
+      if (book.preview) {
+        const coverImg = document.createElement('img');
+        coverImg.src = utils.e(book.preview);
+        coverImg.alt = 'Cover';
+        coverImg.className = 'w-12 h-16 object-cover rounded';
+        previewCell.appendChild(coverImg);
+      } else {
+        const noCover = document.createElement('div');
+        noCover.className = 'w-12 h-16 rounded flex items-center justify-center opacity-70 text-xs';
+        noCover.style.background = 'var(--bg-soft)';
+        noCover.textContent = 'No Cover';
+        previewCell.appendChild(noCover);
+      }
+      
+      // Cellule Title
+      const titleCell = document.createElement('td');
+      titleCell.className = 'p-3 font-medium';
+      titleCell.textContent = utils.e(book.title) || 'Untitled';
+      
+      // Cellule Author
+      const authorCell = document.createElement('td');
+      authorCell.className = 'p-3';
+      authorCell.textContent = cleanAuthor(book.author);
+      
+      // Cellule Publisher
+      const publisherCell = document.createElement('td');
+      publisherCell.className = 'p-3';
+      publisherCell.textContent = utils.e(book.publisher) || '-';
+      
+      // Cellule Year
+      const yearCell = document.createElement('td');
+      yearCell.className = 'p-3';
+      yearCell.textContent = cleanYear(book.year || book.releaseDate);
+      
+      // Cellule Language
+      const languageCell = document.createElement('td');
+      languageCell.className = 'p-3';
+      languageCell.textContent = utils.e(book.language) || '-';
+      
+      // Cellule Format
+      const formatCell = document.createElement('td');
+      formatCell.className = 'p-3';
+      formatCell.textContent = utils.e(book.format) || '-';
+      
+      // Cellule Size
+      const sizeCell = document.createElement('td');
+      sizeCell.className = 'p-3';
+      sizeCell.textContent = utils.e(book.size) || '-';
+      
+      // Cellule Actions
+      const actionsCell = document.createElement('td');
+      actionsCell.className = 'p-3';
+      const actionsContainer = document.createElement('div');
+      actionsContainer.className = 'flex flex-col gap-1 items-center';
+      
+      const actionBtn = document.createElement('button');
+      actionBtn.className = 'px-2 py-1 rounded border text-xs w-full';
+      actionBtn.style.borderColor = 'var(--border-muted)';
+      actionBtn.textContent = isAppleBook ? 'Search' : 'Details';
+      actionBtn.setAttribute('data-action', isAppleBook ? 'search' : 'details');
+      actionBtn.setAttribute('data-title', utils.e(book.title));
+      
+      if (isAppleBook) {
+        actionBtn.addEventListener('click', () => {
+          this.searchForAppleBook(book.title);
+        });
+      } else {
+        actionBtn.addEventListener('click', () => {
+          bookDetails.show(book.id);
+        });
+      }
+      
+      actionsContainer.appendChild(actionBtn);
+      actionsCell.appendChild(actionsContainer);
+      
+      // Assembler la ligne
+      const row = document.createElement('tr');
+      row.className = 'border-b';
+      row.style.borderColor = 'var(--border-muted)';
+      if (isAppleBook) {
+        row.classList.add('apple-book-card');
+      }
+      
+      row.appendChild(previewCell);
+      row.appendChild(titleCell);
+      row.appendChild(authorCell);
+      row.appendChild(publisherCell);
+      row.appendChild(yearCell);
+      row.appendChild(languageCell);
+      row.appendChild(formatCell);
+      row.appendChild(sizeCell);
+      row.appendChild(actionsCell);
+      
+      return row;
+    },
+    
+    createMiniCard(book) {
+      const isAppleBook = book.isAppleBook || false;
+      
+      const cover = book.preview ?
+        `<img src="${utils.e(book.preview)}" alt="Cover" class="w-full h-32 object-cover rounded cursor-pointer mini-cover" data-book-id="${utils.e(book.id)}" data-src="${utils.e(book.preview)}">` :
+        `<div class="w-full h-32 rounded flex items-center justify-center opacity-70 text-xs" style="background: var(--bg-soft)">No Cover</div>`;
+      
+      const html = `
+        <div class="mini-book-card cursor-pointer hover:opacity-80 transition-opacity ${isAppleBook ? 'apple-book-card' : ''}" data-book-id="${utils.e(book.id)}" data-apple-book="${isAppleBook}">
+          ${cover}
+          <div class="mt-2">
+            <h4 class="text-sm font-medium line-clamp-2" title="${utils.e(book.title || 'Untitled')}">${utils.e(book.title) || 'Untitled'}</h4>
+            <p class="text-xs opacity-70 line-clamp-1" title="${utils.e(book.author || 'Unknown author')}">${utils.e(book.author) || 'Unknown author'}</p>
+          </div>
+        </div>
+      `;
+      
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = html;
+      const card = wrapper.firstElementChild;
+      
+      // Ajouter le gestionnaire d'événements pour le zoom (uniquement pour les non-Apple Books)
+      const coverImg = card.querySelector('.mini-cover');
+      if (coverImg && window.innerWidth > 768 && !isAppleBook) {
+        coverImg.addEventListener('click', (e) => {
+          e.stopPropagation();
+          coverZoomManager.showZoomedImage(coverImg);
+        });
+      }
+      
+      // Ajouter le gestionnaire pour les détails/recherche
+      card.addEventListener('click', () => {
+        if (isAppleBook) {
+          // Pour les livres Apple Books, lancer une recherche avec le titre
+          this.searchForAppleBook(book.title, book.author);
+        } else {
+          // Pour les livres normaux, afficher les détails
+          bookDetails.show(book.id);
+        }
+      });
+      
+      return card;
+    },
+    
+    searchForAppleBook(title, author) {
+      // Remplir le champ de recherche avec uniquement le titre
+      if (el.searchInput) {
+        el.searchInput.value = title.trim();
+        
+        // Défiler vers la section de recherche
+        const searchSection = document.getElementById('search-section');
+        if (searchSection) {
+          searchSection.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Lancer la recherche
+        search.run();
+      }
+    },
+    
+    init() {
+      // Bind refresh buttons
+      el.refreshRecentBtn?.addEventListener('click', () => this.fetchRecentDownloads());
+      el.refreshPopularBtn?.addEventListener('click', () => this.fetchPopularBooks());
+      
+      // Bind view toggle buttons for popular books
+      el.popularViewGridBtn?.addEventListener('click', () => this.setPopularView(VIEW_MODES.GRID));
+      el.popularViewListBtn?.addEventListener('click', () => this.setPopularView(VIEW_MODES.LIST));
+      
+      // Charger les données initiales
+      this.fetchRecentDownloads();
+      this.fetchPopularBooks();
+    },
+    
+    setPopularView(viewMode) {
+      // Mettre à jour les boutons
+      document.querySelectorAll('#popular-view-toggle-container .view-toggle').forEach(btn => {
+        if (btn.getAttribute('data-view') === viewMode) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+      
+      // Re-render les résultats avec la nouvelle vue
+      const currentData = window.lastPopularResults || [];
+      this.renderPopularResults(currentData);
+    }
+  };
+
   // ---- Init ----
   compatibility.init(); // Initialize compatibility checks first
   compatibility.initDynamicWillChange(); // Initialize performance manager
   theme.init();
   viewManager.init(); // Initialize view manager
+  homeSections.init(); // Initialize home sections
   sidebar.init();
   initEvents();
   initCoverZoomEvents(); // Initialize cover zoom events
