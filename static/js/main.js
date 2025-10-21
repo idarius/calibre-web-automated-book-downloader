@@ -86,9 +86,6 @@
         document.body.classList.add('reduced-motion');
         console.log('♿ Reduced motion preference detected');
       }
-      
-      // Initialize dynamic will-change management
-      this.initDynamicWillChange();
     },
     
     initDynamicWillChange() {
@@ -132,6 +129,7 @@
       });
     }
   };
+
   // ---- DOM ----
   const el = {
     searchInput: document.getElementById('search-input'),
@@ -1413,6 +1411,7 @@
 
   // ---- Init ----
   compatibility.init(); // Initialize compatibility checks first
+  compatibility.initDynamicWillChange(); // Initialize performance manager
   theme.init();
   sidebar.init();
   initEvents();

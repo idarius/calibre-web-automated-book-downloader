@@ -138,8 +138,6 @@ header::before {
     transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
     z-index: -1;
-    will-change: opacity; /* Only animate opacity */
-    transform: translateZ(0); /* Optimized GPU layer */
 }
 
 /* Modern browsers with :has() support - CSS-only shadow effect */
@@ -178,6 +176,7 @@ header::before {
         transition: opacity 0.3s ease;
     }
 }
+
 
 /* Fallback for browsers without backdrop-filter support */
 @supports not (backdrop-filter: blur(8px)) {
