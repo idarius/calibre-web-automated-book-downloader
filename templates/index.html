@@ -24,298 +24,197 @@
             <li><a href="#" data-theme="auto" class="block px-3 py-1 hover:bg-black/10">Auto (System)</a></li>
         </ul>
     </div>
-    
-    <!-- Header -->
-    <header class="w-full border-b border-[color:var(--border-muted)] sticky top-0 z-[25]" style="background: var(--header-bg);" role="banner">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <a href="/" class="flex items-center gap-3 group hover:opacity-90 transition-opacity duration-200" aria-label="Retour à l'accueil">
-                    <img src="{{ url_for('static', filename='media/logo.png') }}" alt="Logo Book Search & Download" role="img" class="h-8 w-8">
-                    <h1 class="text-lg font-semibold group-hover:text-blue-400 transition-colors duration-200">Book Search & Download</h1>
-                </a>
-            </div>
-            <div class="flex items-center gap-2">
-                {% if debug %}
-                <form action="/request/api/restart" method="get" id="restart-form">
-                    <button class="px-3 py-1 rounded bg-red-600 text-white text-sm" id="restart-button" type="submit">
-                        RESTART
-                    </button>
-                </form>
-                <form action="/request/debug" method="get" id="debug-form">
-                    <button class="px-3 py-1 rounded bg-red-600/80 text-white text-sm" id="debug-button" type="submit">
-                        DEBUG
-                    </button>
-                </form>
-                {% endif %}
 
-                <!-- Sidebar Toggle Button -->
-                <div class="relative">
-                    <button id="sidebar-toggle" class="px-3 py-1 rounded border text-sm relative" style="border-color: var(--border-muted);">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <!-- Mobile Overlay -->
+    <div id="mobile-overlay" class="mobile-overlay"></div>
+
+    <!-- Main Container with Sidebar -->
+    <div class="main-container">
+        <!-- Material Design Sidebar -->
+        <nav id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <img src="{{ url_for('static', filename='media/logo.png') }}" alt="Logo" class="sidebar-logo">
+                <h1 class="sidebar-title">Book Downloader</h1>
+                <button id="sidebar-collapse-toggle" class="sidebar-toggle" aria-label="Toggle sidebar">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="sidebar-nav">
+                <div class="sidebar-item active" data-page="home">
+                    <a href="/" class="sidebar-link">
+                        <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                        <span class="sidebar-text">Accueil</span>
+                        <div class="sidebar-tooltip">Accueil</div>
+                    </a>
+                </div>
+                
+                <div class="sidebar-item" data-page="search">
+                    <a href="/#search" class="sidebar-link">
+                        <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <span class="sidebar-text">Recherche</span>
+                        <div class="sidebar-tooltip">Recherche</div>
+                    </a>
+                </div>
+                
+                <div class="sidebar-item" data-page="popular">
+                    <a href="/#popular" class="sidebar-link">
+                        <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span class="sidebar-text">Populaires</span>
+                        <div class="sidebar-tooltip">Populaires</div>
+                    </a>
+                </div>
+                
+                <div class="sidebar-item" data-page="downloads">
+                    <a href="#downloads" class="sidebar-link" id="downloads-sidebar-link">
+                        <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                         </svg>
-                        <span id="sidebar-badge" class="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center hidden">0</span>
-                    </button>
-                </div>
-
-                <!-- Theme Dropdown -->
-                <div class="relative">
-                    <button id="theme-toggle" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">
-                        <span id="theme-text">Theme</span>
-                    </button>
+                        <span class="sidebar-text">Téléchargements</span>
+                        <div class="sidebar-tooltip">Téléchargements</div>
+                    </a>
                 </div>
             </div>
-        </div>
-    </header>
+        </nav>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <!-- Sidebar Panel -->
-        <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-[40] hidden"></div>
-        <div id="sidebar-panel" class="fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-gray-800 shadow-xl z-[45] transform translate-x-full transition-transform duration-300 ease-in-out">
-            <div class="h-full flex flex-col" style="background: var(--bg-soft);">
-                <!-- Sidebar Header -->
-                <div class="flex items-center justify-between p-4 border-b" style="border-color: var(--border-muted);">
-                    <h2 class="text-lg font-semibold">Download Queue & Status</h2>
-                    <button id="sidebar-close" class="p-1 rounded hover:bg-black/10">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-                
-                <!-- Sidebar Content -->
-                <div class="flex-1 overflow-y-auto p-4">
-                    <div id="sidebar-status-loading" class="text-sm opacity-80 hidden">Loading…</div>
-                    <div id="sidebar-status-list" class="space-y-2"></div>
-                    <div id="sidebar-no-results" class="text-sm opacity-80 hidden">No downloads.</div>
-                </div>
-                
-                <!-- Sidebar Footer -->
-                <div class="p-4 border-t" style="border-color: var(--border-muted);">
-                    <div class="flex items-center gap-2">
-                        <button id="sidebar-refresh-button" class="px-3 py-1 rounded border text-sm flex-1" style="border-color: var(--border-muted);">Refresh</button>
-                        <button id="sidebar-clear-completed-button" class="px-3 py-1 rounded border text-sm flex-1" style="border-color: var(--border-muted);">Clear Completed</button>
-                    </div>
-                    <div class="mt-2 text-xs opacity-60 text-center">
-                        <span id="sidebar-active-downloads-count">Active: 0</span> • Auto-refresh: 7s
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- Hero / Search -->
-        <section class="mb-6">
-            <div class="flex flex-col gap-3">
-                <div class="flex gap-2">
-                    <input id="search-input" type="search" placeholder="Search by ISBN, title, author..." aria-label="Search books"
-                           class="flex-1 px-4 py-3 rounded-md border outline-none"
-                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
-                    <button id="search-button" class="px-4 py-3 rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                        Search
-                    </button>
-                </div>
-                <div>
-                    <button id="toggle-advanced" class="text-sm underline opacity-80 hover:opacity-100">Advanced Search</button>
-                </div>
-                <!-- Advanced Filters -->
-                <form id="search-filters" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 hidden">
-                    <div>
-                        <label for="isbn-input" class="block text-sm mb-1 opacity-80">ISBN</label>
-                        <input id="isbn-input" type="search" placeholder="ISBN"
-                               class="w-full px-3 py-2 rounded-md border"
-                               style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
-                    </div>
-                    <div>
-                        <label for="author-input" class="block text-sm mb-1 opacity-80">Author</label>
-                        <input id="author-input" type="search" placeholder="Author"
-                               class="w-full px-3 py-2 rounded-md border"
-                               style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
-                    </div>
-                    <div>
-                        <label for="title-input" class="block text-sm mb-1 opacity-80">Title</label>
-                        <input id="title-input" type="search" placeholder="Title"
-                               class="w-full px-3 py-2 rounded-md border"
-                               style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
-                    </div>
-                    <div>
-                        <label for="lang-input" class="block text-sm mb-1 opacity-80">Language</label>
-                        <select id="lang-input" class="w-full px-3 py-2 rounded-md border"
-                                style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
-                            <option value="all">All</option>
-                            {% for lang in book_languages %}
-                                <option value="{{ lang.code }}" {% if lang.code == default_language[0] %}selected{% endif %}>
-                                    {{ lang.language }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="sort-input" class="block text-sm mb-1 opacity-80">Sort</label>
-                        <select id="sort-input" class="w-full px-3 py-2 rounded-md border"
-                                style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
-                            <option value="">Most relevant</option>
-                            <option value="newest">Newest (publication year)</option>
-                            <option value="oldest">Oldest (publication year)</option>
-                            <option value="largest">Largest (filesize)</option>
-                            <option value="smallest">Smallest (filesize)</option>
-                            <option value="newest_added">Newest (open sourced)</option>
-                            <option value="oldest_added">Oldest (open sourced)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="content-input" class="block text sm mb-1 opacity-80">Content</label>
-                        <select id="content-input" class="w-full px-3 py-2 rounded-md border"
-                                style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
-                            <option value="">All</option>
-                            <option value="book_nonfiction">Book (non-fiction)</option>
-                            <option value="book_fiction">Book (fiction)</option>
-                            <option value="book_unknown">Book (unknown)</option>
-                            <option value="magazine">Magazine</option>
-                            <option value="book_comic">Comic Book</option>
-                            <option value="standards_document">Standards document</option>
-                            <option value="other">Other</option>
-                            <option value="musical_score">Musical score</option>
-                            <option value="audiobook">Audiobook</option>
-                        </select>
-                    </div>
-                    <div class="md:col-span-2 lg:col-span-3">
-                        <label class="block text-sm mb-1 opacity-80">Formats</label>
-                        <div class="flex flex-wrap gap-3 text-sm">
-                            <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'pdf' not in supported_formats else '' }}">
-                                <input type="checkbox" id="format-pdf" value="pdf" {% if 'pdf' not in supported_formats %}disabled{% endif %}>
-                                PDF
-                            </label>
-                            <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'epub' not in supported_formats else '' }}">
-                                <input type="checkbox" id="format-epub" value="epub" {% if 'epub' in supported_formats %}checked{% endif %} {% if 'epub' not in supported_formats %}disabled{% endif %}>
-                                EPUB
-                            </label>
-                            <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'mobi' not in supported_formats else '' }}">
-                                <input type="checkbox" id="format-mobi" value="mobi" {% if 'mobi' in supported_formats %}checked{% endif %} {% if 'mobi' not in supported_formats %}disabled{% endif %}>
-                                MOBI
-                            </label>
-                            <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'azw3' not in supported_formats else '' }}">
-                                <input type="checkbox" id="format-azw3" value="azw3" {% if 'azw3' in supported_formats %}checked{% endif %} {% if 'azw3' not in supported_formats %}disabled{% endif %}>
-                                AZW3
-                            </label>
-                            <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'fb2' not in supported_formats else '' }}">
-                                <input type="checkbox" id="format-fb2" value="fb2" {% if 'fb2' in supported_formats %}checked{% endif %} {% if 'fb2' not in supported_formats %}disabled{% endif %}>
-                                FB2
-                            </label>
-                            <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'djvu' not in supported_formats else '' }}">
-                                <input type="checkbox" id="format-djvu" value="djvu" {% if 'djvu' in supported_formats %}checked{% endif %} {% if 'djvu' not in supported_formats %}disabled{% endif %}>
-                                DJVU
-                            </label>
-                            <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'cbz' not in supported_formats else '' }}">
-                                <input type="checkbox" id="format-cbz" value="cbz" {% if 'cbz' in supported_formats %}checked{% endif %} {% if 'cbz' not in supported_formats %}disabled{% endif %}>
-                                CBZ
-                            </label>
-                            <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'cbr' not in supported_formats else '' }}">
-                                <input type="checkbox" id="format-cbr" value="cbr" {% if 'cbr' in supported_formats %}checked{% endif %} {% if 'cbr' not in supported_formats %}disabled{% endif %}>
-                                CBR
-                            </label>
-                        </div>
-                    </div>
-                    <div class="md:col-span-2 lg:col-span-3 flex justify-end">
-                        <button id="adv-search-button" type="button" class="px-4 py-2 rounded-md border"
-                                style="border-color: var(--border-muted);">Search</button>
-                    </div>
-                </form>
-            </div>
-        </section>
-
-        <!-- Active Downloads (Top) -->
-        <section id="active-downloads-top" class="mb-6 hidden">
-            <div class="flex items-center justify-between mb-2">
-                <h2 class="text-lg font-semibold">Active Downloads</h2>
-                <button id="active-refresh-button" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">Refresh</button>
-            </div>
-            <div id="active-downloads-list" class="space-y-2"></div>
-        </section>
-
-        <!-- Home Content Sections -->
-        <section class="mb-8" id="home-sections">
-            <!-- Recent Downloads -->
-            <div class="mb-8">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-xl font-semibold">Recent Downloads</h2>
-                    <button id="refresh-recent" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        Refresh
-                    </button>
-                </div>
-                <div id="recent-downloads-loading" class="text-sm opacity-80 hidden">Loading…</div>
-                <div id="recent-downloads-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                    <!-- Recent download cards will be injected here -->
-                </div>
-                <div id="no-recent-downloads" class="text-sm opacity-80 hidden">No recent downloads.</div>
-            </div>
-
-            <!-- Popular Books -->
-            <div class="mb-8">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-xl font-semibold">Popular This Month</h2>
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="w-full border-b border-[color:var(--border-muted)] sticky top-0 z-[25]" style="background: var(--header-bg);" role="banner">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                     <div class="flex items-center gap-3">
-                        <div class="flex items-center border rounded" style="border-color: var(--border-muted);" id="popular-view-toggle-container">
-                            <button id="popular-view-grid" class="px-2 py-1 text-sm view-toggle active" title="Vue grille" data-view="grid">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                                </svg>
-                            </button>
-                            <button id="popular-view-list" class="px-2 py-1 text-sm view-toggle" title="Vue liste" data-view="list">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                            </button>
-                        </div>
-                        <button id="refresh-popular" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Refresh
-                        </button>
-                    </div>
-                </div>
-                <div id="popular-books-loading" class="text-sm opacity-80 hidden">Loading…</div>
-                <div id="popular-books-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    <!-- Popular book cards will be injected here -->
-                </div>
-                <div id="no-popular-books" class="text-sm opacity-80 hidden">No popular books available.</div>
-            </div>
-        </section>
-
-        <!-- Results -->
-        <section class="mb-8" id="search-section">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="text-xl font-semibold">Search Results</h2>
-                <div class="flex items-center gap-3">
-                    <div id="search-loading" class="text-sm opacity-80 hidden">Loading…</div>
-                    <div class="flex items-center border rounded" style="border-color: var(--border-muted);" id="view-toggle-container">
-                        <button id="view-grid" class="px-2 py-1 text-sm view-toggle active" title="Vue grille" data-view="grid">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                            </svg>
-                        </button>
-                        <button id="view-list" class="px-2 py-1 text-sm view-toggle" title="Vue liste" data-view="list">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <!-- Mobile Menu Button -->
+                        <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Toggle mobile menu">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
                         </button>
+                        
+                        <a href="/" class="flex items-center gap-3 group hover:opacity-90 transition-opacity duration-200" aria-label="Retour à l'accueil">
+                            <img src="{{ url_for('static', filename='media/logo.png') }}" alt="Logo Book Search & Download" role="img" class="h-8 w-8">
+                            <h1 class="text-lg font-semibold group-hover:text-blue-400 transition-colors duration-200">Book Search & Download</h1>
+                        </a>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {% if debug %}
+                        <form action="/request/api/restart" method="get" id="restart-form">
+                            <button class="px-3 py-1 rounded bg-red-600 text-white text-sm" id="restart-button" type="submit">
+                                RESTART
+                            </button>
+                        </form>
+                        <form action="/request/debug" method="get" id="debug-form">
+                            <button class="px-3 py-1 rounded bg-red-600/80 text-white text-sm" id="debug-button" type="submit">
+                                DEBUG
+                            </button>
+                        </form>
+                        {% endif %}
+
+                        <!-- Sidebar Toggle Button -->
+                        <div class="relative">
+                            <button id="sidebar-toggle" class="px-3 py-1 rounded border text-sm relative" style="border-color: var(--border-muted);">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                                </svg>
+                                <span id="sidebar-badge" class="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center hidden">0</span>
+                            </button>
+                        </div>
+
+                        <!-- Theme Dropdown -->
+                        <div class="relative">
+                            <button id="theme-toggle" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">
+                                <span id="theme-text">Theme</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div id="results-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                <!-- Cards/List items will be injected here -->
-            </div>
-            <div id="no-results" class="mt-4 text-sm opacity-80 hidden">No results found.</div>
-        </section>
+            </header>
 
-        <!-- Modal -->
-        <div class="modal-overlay z-[100]" id="modal-overlay" role="dialog" aria-modal="true">
-            <div class="details-container" id="details-container"></div>
+            <!-- Page Content -->
+            <div id="page-content" class="page-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <!-- Home Page Content (Minimalist) -->
+                <div id="home-page" class="page-content">
+                    <div class="text-center py-16">
+                        <img src="{{ url_for('static', filename='media/logo.png') }}" alt="Book Downloader" class="w-24 h-24 mx-auto mb-8 opacity-80">
+                        <h1 class="text-4xl font-light mb-4" style="color: var(--text);">Bienvenue sur Book Downloader</h1>
+                        <p class="text-lg opacity-70 mb-8 max-w-2xl mx-auto" style="color: var(--text);">
+                            Utilisez le menu de navigation pour accéder à la recherche, découvrir les livres populaires ou gérer vos téléchargements.
+                        </p>
+                        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                            <button onclick="navigation.navigateToPage('search', '/#search')" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 inline-flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                Commencer à rechercher
+                            </button>
+                            <button onclick="navigation.navigateToPage('popular', '/#popular')" class="px-6 py-3 border rounded-lg transition-colors duration-200 inline-flex items-center gap-2" style="border-color: var(--border-muted); color: var(--text);">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                                Découvrir les populaires
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search Page Content (Hidden by default) -->
+                <div id="search-page" class="page-content hidden">
+                    <!-- Content will be loaded dynamically -->
+                </div>
+
+                <!-- Popular Page Content (Hidden by default) -->
+                <div id="popular-page" class="page-content hidden">
+                    <!-- Content will be loaded dynamically -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Downloads Sidebar Panel -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-[40] hidden"></div>
+    <div id="sidebar-panel" class="fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-gray-800 shadow-xl z-[45] transform translate-x-full transition-transform duration-300 ease-in-out">
+        <div class="h-full flex flex-col" style="background: var(--bg-soft);">
+            <!-- Sidebar Header -->
+            <div class="flex items-center justify-between p-4 border-b" style="border-color: var(--border-muted);">
+                <h2 class="text-lg font-semibold">Download Queue & Status</h2>
+                <button id="sidebar-close" class="p-1 rounded hover:bg-black/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Sidebar Content -->
+            <div class="flex-1 overflow-y-auto p-4">
+                <div id="sidebar-status-loading" class="text-sm opacity-80 hidden">Loading…</div>
+                <div id="sidebar-status-list" class="space-y-2"></div>
+                <div id="sidebar-no-results" class="text-sm opacity-80 hidden">No downloads.</div>
+            </div>
+            
+            <!-- Sidebar Footer -->
+            <div class="p-4 border-t" style="border-color: var(--border-muted);">
+                <div class="flex items-center gap-2">
+                    <button id="sidebar-refresh-button" class="px-3 py-1 rounded border text-sm flex-1" style="border-color: var(--border-muted);">Refresh</button>
+                    <button id="sidebar-clear-completed-button" class="px-3 py-1 rounded border text-sm flex-1" style="border-color: var(--border-muted);">Clear Completed</button>
+                </div>
+                <div class="mt-2 text-xs opacity-60 text-center">
+                    <span id="sidebar-active-downloads-count">Active: 0</span> • Auto-refresh: 7s
+                </div>
+            </div>
         </div>
+    </div>
 
-    </main>
+    <!-- Modal -->
+    <div class="modal-overlay z-[100]" id="modal-overlay" role="dialog" aria-modal="true">
+        <div class="details-container" id="details-container"></div>
+    </div>
 
     <footer class="mt-10 border-t pt-6 pb-10" style="border-color: var(--border-muted); background: var(--footer-bg);">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">

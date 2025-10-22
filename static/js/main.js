@@ -1,7 +1,980 @@
-// Modern UI script: search, cards, details, downloads, status, theme
+// Modern UI script: search, cards, details, downloads, status, theme, navigation
 // Reuses existing API endpoints. Keeps logic minimal and accessible.
 
 (function () {
+  // ---- Navigation State ----
+  const navigation = {
+    currentPage: 'home',
+    isSidebarCollapsed: false,
+    isMobileMenuOpen: false,
+    
+    init() {
+      this.setupSidebarToggle();
+      this.setupMobileMenu();
+      this.setupNavigationLinks();
+      this.setupDownloadsLink();
+      this.loadInitialState();
+    },
+    
+    setupSidebarToggle() {
+      const toggleBtn = document.getElementById('sidebar-collapse-toggle');
+      const sidebar = document.getElementById('sidebar');
+      
+      if (toggleBtn && sidebar) {
+        toggleBtn.addEventListener('click', () => {
+          this.toggleSidebar();
+        });
+      }
+    },
+    
+    setupMobileMenu() {
+      const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+      const mobileOverlay = document.getElementById('mobile-overlay');
+      const sidebar = document.getElementById('sidebar');
+      
+      if (mobileMenuBtn) {
+        mobileMenuBtn.addEventListener('click', () => {
+          this.toggleMobileMenu();
+        });
+      }
+      
+      if (mobileOverlay) {
+        mobileOverlay.addEventListener('click', () => {
+          this.closeMobileMenu();
+        });
+      }
+      
+      // Close mobile menu when clicking a navigation item
+      if (sidebar) {
+        sidebar.addEventListener('click', (e) => {
+          if (window.innerWidth <= 768 && e.target.closest('.sidebar-link')) {
+            this.closeMobileMenu();
+          }
+        });
+      }
+    },
+    
+    setupNavigationLinks() {
+      const sidebarItems = document.querySelectorAll('.sidebar-item');
+      
+      sidebarItems.forEach(item => {
+        const link = item.querySelector('.sidebar-link');
+        if (link && !link.id) { // Skip special links like downloads
+          link.addEventListener('click', (e) => {
+            // Toujours utiliser la navigation SPA pour toutes les pages
+            e.preventDefault();
+            const targetPage = item.getAttribute('data-page');
+            const hashUrl = '/' + (targetPage === 'home' ? '' : '#' + targetPage);
+            this.navigateToPage(targetPage, hashUrl);
+          });
+        }
+      });
+      
+      // Gérer également les liens dans le contenu (comme les boutons sur la page d'accueil)
+      document.addEventListener('click', (e) => {
+        const target = e.target.closest('a[href="/#search"], a[href="/#popular"]');
+        if (target) {
+          e.preventDefault();
+          const href = target.getAttribute('href');
+          const page = href.includes('/#search') ? 'search' : 'popular';
+          this.navigateToPage(page, href);
+        }
+      });
+    },
+    
+    getCurrentPageFromPath() {
+      const path = window.location.pathname;
+      if (path.includes('/search')) return 'search';
+      if (path.includes('/popular')) return 'popular';
+      return 'home';
+    },
+    
+    setupDownloadsLink() {
+      const downloadsLink = document.getElementById('downloads-sidebar-link');
+      if (downloadsLink) {
+        downloadsLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          // Use existing sidebar functionality
+          if (typeof sidebar !== 'undefined') {
+            sidebar.toggle();
+          }
+        });
+      }
+    },
+    
+    toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar) {
+        this.isSidebarCollapsed = !this.isSidebarCollapsed;
+        sidebar.classList.toggle('collapsed');
+        
+        // Save preference
+        localStorage.setItem('sidebar-collapsed', this.isSidebarCollapsed.toString());
+      }
+    },
+    
+    toggleMobileMenu() {
+      if (this.isMobileMenuOpen) {
+        this.closeMobileMenu();
+      } else {
+        this.openMobileMenu();
+      }
+    },
+    
+    openMobileMenu() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('mobile-overlay');
+      
+      if (sidebar && overlay) {
+        sidebar.classList.add('mobile-open');
+        overlay.classList.add('active');
+        this.isMobileMenuOpen = true;
+        
+        // Prevent body scroll
+        document.body.style.overflow = 'hidden';
+      }
+    },
+    
+    closeMobileMenu() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('mobile-overlay');
+      
+      if (sidebar && overlay) {
+        sidebar.classList.remove('mobile-open');
+        overlay.classList.remove('active');
+        this.isMobileMenuOpen = false;
+        
+        // Restore body scroll
+        document.body.style.overflow = '';
+      }
+    },
+    
+    async navigateToPage(page, url) {
+      if (page === this.currentPage) return;
+      
+      try {
+        // Show loading state
+        this.showPageLoading();
+        
+        // Update current page IMMÉDIATEMENT pour éviter les conflits
+        this.currentPage = page;
+        
+        // Update active state in sidebar
+        this.updateActiveMenuItem(page);
+        
+        // Load page content with better error handling
+        await this.loadPageContent(page);
+        
+        // Update browser history with hash for SPA navigation
+        if (page === 'home') {
+          history.pushState({ page }, '', '/');
+        } else {
+          // Utiliser l'URL avec hash pour éviter les requêtes au serveur
+          const hashUrl = '/#' + page;
+          history.pushState({ page }, '', hashUrl);
+        }
+        
+        // Hide loading state
+        this.hidePageLoading();
+        
+        // Initialize page-specific functionality with delay
+        setTimeout(() => {
+          this.initializePage(page);
+        }, 50);
+        
+      } catch (error) {
+        console.error('Navigation error:', error);
+        this.hidePageLoading();
+        
+        // Show error message and fallback
+        this.showErrorMessage('Erreur de chargement. Tentative de navigation traditionnelle...');
+        
+        // Fallback to traditional navigation after a short delay
+        setTimeout(() => {
+          window.location.href = url;
+        }, 1000);
+      }
+    },
+    
+    showErrorMessage(message) {
+      const pageContent = document.getElementById('page-content');
+      if (pageContent) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'text-center py-8 px-4';
+        errorDiv.style.color = 'var(--text)';
+        errorDiv.innerHTML = `
+          <div class="mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p class="text-lg font-medium mb-2">${message}</p>
+          <button onclick="window.location.reload()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md">
+            Actualiser la page
+          </button>
+        `;
+        pageContent.innerHTML = '';
+        pageContent.appendChild(errorDiv);
+      }
+    },
+    
+    updateActiveMenuItem(page) {
+      const sidebarItems = document.querySelectorAll('.sidebar-item');
+      
+      sidebarItems.forEach(item => {
+        const itemPage = item.getAttribute('data-page');
+        if (itemPage === page) {
+          item.classList.add('active');
+        } else {
+          item.classList.remove('active');
+        }
+      });
+    },
+    
+    async loadPageContent(page) {
+      console.log(`=== loadPageContent called for: ${page} ===`);
+      
+      // Hide all page containers first
+      const allPages = document.querySelectorAll('[id$="-page"]');
+      console.log(`Found ${allPages.length} page containers`);
+      for (const pageEl of allPages) {
+        pageEl.classList.add('hidden');
+      }
+      
+      // Show the target page container
+      const targetPage = document.getElementById(`${page}-page`);
+      if (!targetPage) {
+        console.error(`Target page container not found: #${page}-page`);
+        throw new Error(`Target page container not found: #${page}-page`);
+      }
+      
+      console.log(`Target page container found: #${page}-page`);
+      
+      // Special handling for home page - content is already in HTML
+      if (page === 'home') {
+        console.log('Loading home page (content already in HTML)');
+        targetPage.classList.remove('hidden');
+        return;
+      }
+      
+      // Make sure the target page is visible before loading content
+      targetPage.classList.remove('hidden');
+      console.log(`Made ${page}-page visible`);
+      
+      // For search and popular pages, fetch content
+      const contentMap = {
+        'search': this.getSearchContent(),
+        'popular': this.getPopularContent()
+      };
+      
+      const content = contentMap[page];
+      if (!content) {
+        console.error(`Unknown page: ${page}`);
+        throw new Error(`Unknown page: ${page}`);
+      }
+      
+      try {
+        console.log(`Starting to load content for page: ${page}`);
+        let finalContent;
+        if (typeof content === 'string') {
+          finalContent = content;
+          console.log(`Content is a string, length: ${finalContent.length}`);
+        } else {
+          // For complex content, we might need to fetch from server
+          console.log('Content is a function, calling it...');
+          finalContent = await content;
+          console.log(`Function returned content, length: ${finalContent ? finalContent.length : 'null'}`);
+        }
+        
+        // Validate content before setting
+        if (!finalContent || (typeof finalContent === 'string' && finalContent.trim() === '')) {
+          console.error(`Empty content received for page: ${page}`);
+          throw new Error(`Empty content received for page: ${page}`);
+        }
+        
+        // Set content in the appropriate page container (replaces loading indicator)
+        targetPage.innerHTML = finalContent;
+        console.log(`Content set successfully for page: ${page}, innerHTML length: ${targetPage.innerHTML.length}`);
+        
+        // For search and popular pages, we need to ensure the content is properly structured
+        if (page === 'search' || page === 'popular') {
+          // Add a small delay to ensure DOM is updated before initializing
+          await new Promise(resolve => setTimeout(resolve, 50));
+          console.log(`Delay added for ${page} page initialization`);
+        }
+        
+      } catch (contentError) {
+        console.error('Error setting page content:', contentError);
+        console.error('Error details:', {
+          message: contentError.message,
+          stack: contentError.stack,
+          page
+        });
+        // Set fallback content
+        targetPage.innerHTML = `
+          <div class="text-center py-8">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-red-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-lg font-medium mb-2">Erreur lors du chargement du contenu</p>
+            <p class="text-sm opacity-70 mb-4">Veuillez réessayer plus tard</p>
+            <p class="text-xs opacity-50 mb-4">Erreur: ${contentError.message}</p>
+            <button onclick="navigation.navigateToPage('${page}', '/${page}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md">
+              Réessayer
+            </button>
+          </div>
+        `;
+      }
+    },
+    
+    getHomeContent() {
+      // Pour la page d'accueil, nous retournons une chaîne vide car le contenu est déjà dans le HTML
+      // Nous allons juste afficher/masquer les conteneurs appropriés
+      return '';
+    },
+    
+    async getSearchContent() {
+      try {
+        const response = await fetch('/request/search');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        
+        // Validate response structure
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid response format');
+        }
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        const content = data.content || '';
+        if (!content || content.trim() === '') {
+          throw new Error('Empty content received');
+        }
+        
+        return content;
+      } catch (error) {
+        console.error('Error loading search content:', error);
+        // Return fallback content instead of throwing
+        return `
+          <div class="text-center py-8">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-red-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-lg font-medium mb-2">Erreur lors du chargement de la recherche</p>
+            <p class="text-sm opacity-70 mb-4">Veuillez réessayer plus tard</p>
+            <button onclick="navigation.navigateToPage('search', '/search')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md">
+              Réessayer
+            </button>
+          </div>
+        `;
+      }
+    },
+    
+    async getPopularContent() {
+      try {
+        const response = await fetch('/request/popular');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        
+        // Validate response structure
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid response format');
+        }
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        const content = data.content || '';
+        if (!content || content.trim() === '') {
+          throw new Error('Empty content received');
+        }
+        
+        return content;
+      } catch (error) {
+        console.error('Error loading popular content:', error);
+        // Return fallback content instead of throwing
+        return `
+          <div class="text-center py-8">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-red-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-lg font-medium mb-2">Erreur lors du chargement des livres populaires</p>
+            <p class="text-sm opacity-70 mb-4">Veuillez réessayer plus tard</p>
+            <button onclick="navigation.navigateToPage('popular', '/popular')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md">
+              Réessayer
+            </button>
+          </div>
+        `;
+      }
+    },
+    
+    showPageLoading() {
+      const pageContent = document.getElementById('page-content');
+      if (pageContent) {
+        pageContent.classList.add('page-loading');
+      }
+    },
+    
+    hidePageLoading() {
+      const pageContent = document.getElementById('page-content');
+      if (pageContent) {
+        pageContent.classList.remove('page-loading');
+      }
+    },
+    
+    initializePage(page) {
+      switch (page) {
+        case 'search':
+          this.initializeSearchPage();
+          break;
+        case 'popular':
+          this.initializePopularPage();
+          break;
+      }
+    },
+    
+    refreshSearchElements() {
+      // Mettre à jour les références aux éléments de recherche
+      el.resultsContainer = document.getElementById('results-container');
+      el.noResults = document.getElementById('no-results');
+      el.searchLoading = document.getElementById('search-loading');
+      el.viewToggleContainer = document.getElementById('view-toggle-container');
+      el.viewGridBtn = document.getElementById('view-grid');
+      el.viewListBtn = document.getElementById('view-list');
+      
+      const elements = {
+        resultsContainer: el.resultsContainer,
+        noResults: el.noResults,
+        searchLoading: el.searchLoading,
+        viewToggleContainer: el.viewToggleContainer,
+        viewGridBtn: el.viewGridBtn,
+        viewListBtn: el.viewListBtn
+      };
+      
+      console.log('Search elements refreshed:', {
+        resultsContainer: !!el.resultsContainer,
+        noResults: !!el.noResults,
+        searchLoading: !!el.searchLoading,
+        viewToggleContainer: !!el.viewToggleContainer,
+        viewGridBtn: !!el.viewGridBtn,
+        viewListBtn: !!el.viewListBtn
+      });
+      
+      return elements;
+    },
+
+    initializeSearchPage() {
+      // Attendre que le DOM soit complètement chargé
+      setTimeout(() => {
+        // Mettre à jour les références aux éléments de recherche
+        this.refreshSearchElements();
+        
+        // Re-bind search events avec une vérification d'existence
+        const searchBtn = document.getElementById('search-button');
+        const searchInput = document.getElementById('search-input');
+        const advToggle = document.getElementById('toggle-advanced');
+        const advSearchBtn = document.getElementById('adv-search-button');
+        
+        console.log('Initializing search page, elements found:', {
+          searchBtn: !!searchBtn,
+          searchInput: !!searchInput,
+          advToggle: !!advToggle,
+          advSearchBtn: !!advSearchBtn
+        });
+        
+        // Toujours lier les événements, même si l'objet search n'est pas encore disponible
+        if (searchBtn) {
+          // Supprimer les anciens gestionnaires d'événements pour éviter les doublons
+          searchBtn.replaceWith(searchBtn.cloneNode(true));
+          const newSearchBtn = document.getElementById('search-button');
+          newSearchBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Search button clicked');
+            this.performSearch();
+          });
+        }
+        
+        if (searchInput) {
+          // Supprimer les anciens gestionnaires d'événements pour éviter les doublons
+          const newSearchInput = searchInput.cloneNode(true);
+          searchInput.parentNode.replaceChild(newSearchInput, searchInput);
+          newSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              console.log('Enter key pressed in search input');
+              this.performSearch();
+            }
+          });
+        }
+        
+        // Bind advanced search toggle
+        if (advToggle) {
+          // Supprimer les anciens gestionnaires d'événements pour éviter les doublons
+          advToggle.replaceWith(advToggle.cloneNode(true));
+          const newAdvToggle = document.getElementById('toggle-advanced');
+          newAdvToggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            const filtersForm = document.getElementById('search-filters');
+            if (filtersForm) {
+              filtersForm.classList.toggle('hidden');
+              console.log('Advanced search toggled');
+            }
+          });
+        }
+        
+        // Bind advanced search button
+        if (advSearchBtn) {
+          // Supprimer les anciens gestionnaires d'événements pour éviter les doublons
+          advSearchBtn.replaceWith(advSearchBtn.cloneNode(true));
+          const newAdvSearchBtn = document.getElementById('adv-search-button');
+          newAdvSearchBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Advanced search button clicked');
+            this.performSearch();
+          });
+        }
+        
+        // Initialize view toggle for search results
+        if (typeof viewManager !== 'undefined') {
+          // Forcer la réinitialisation du gestionnaire de vue
+          viewManager.currentView = localStorage.getItem(VIEW_PREFERENCE_KEY) || VIEW_MODES.GRID;
+          
+          // Ajouter un petit délai pour s'assurer que les éléments sont disponibles
+          setTimeout(() => {
+            viewManager.updateViewButtons();
+            console.log('View manager initialized for search page');
+          }, 50);
+        } else {
+          console.error('View manager not available');
+        }
+      }, 100); // Délai pour s'assurer que le DOM est prêt
+    },
+    
+    performSearch() {
+      console.log('=== PERFORM SEARCH CALLED ===');
+      console.log('search object available:', typeof search !== 'undefined');
+      console.log('search.run available:', typeof search !== 'undefined' && search.run);
+      
+      // Exécuter la recherche en utilisant l'objet global search si disponible
+      if (typeof search !== 'undefined' && search.run) {
+        console.log('Using global search object');
+        try {
+          search.run();
+        } catch (error) {
+          console.error('Error in global search.run():', error);
+          // Fallback vers la méthode manuelle
+          this.performManualSearch();
+        }
+      } else {
+        console.log('Using fallback search method');
+        this.performManualSearch();
+      }
+    },
+    
+    performManualSearch() {
+      console.log('=== PERFORM MANUAL SEARCH ===');
+      
+      // Ajouter un petit délai pour s'assurer que le DOM est prêt
+      setTimeout(() => {
+        // Fallback: exécuter la recherche directement
+        const qs = utils.buildQuery();
+        console.log('Search query string:', qs);
+        
+        if (!qs) {
+          console.log('Empty query, showing no results');
+          window.lastSearchResults = [];
+          if (typeof viewManager !== 'undefined') {
+            viewManager.renderResults([]);
+          }
+          return;
+        }
+        
+        // Afficher le chargement
+        const searchLoading = document.getElementById('search-loading');
+        if (searchLoading) {
+          searchLoading.classList.remove('hidden');
+          console.log('Showing loading indicator');
+        }
+        
+        // Vérifier les éléments de résultats
+        const resultsContainer = document.getElementById('results-container');
+        const noResults = document.getElementById('no-results');
+        console.log('Results container available:', !!resultsContainer);
+        console.log('No results element available:', !!noResults);
+        
+        if (!resultsContainer) {
+          console.error('Results container not found, available elements:',
+            Array.from(document.querySelectorAll('[id*="result"]')).map(el => el.id));
+          console.error('All elements with IDs containing "result":',
+            Array.from(document.querySelectorAll('[id*="result"]')));
+          console.error('All elements in page:',
+            Array.from(document.querySelectorAll('[id]')).slice(0, 20).map(el => el.id));
+        }
+        
+        // Exécuter la recherche
+        const searchUrl = `${API.search}?${qs}`;
+        console.log('Executing search with URL:', searchUrl);
+        
+        // Afficher un message de débogage dans le conteneur de résultats
+        if (resultsContainer) {
+          resultsContainer.innerHTML = '<div class="text-center p-4">Recherche en cours...</div>';
+        } else {
+          console.error('Results container not found in performManualSearch, trying to refresh elements');
+          // Essayer de rafraîchir les éléments si le conteneur n'est pas trouvé
+          if (typeof navigation !== 'undefined' && navigation.refreshSearchElements) {
+            navigation.refreshSearchElements();
+            resultsContainer = el.resultsContainer || document.getElementById('results-container');
+            if (resultsContainer) {
+              resultsContainer.innerHTML = '<div class="text-center p-4">Recherche en cours...</div>';
+            }
+          }
+        }
+        
+        utils.j(searchUrl).then(data => {
+          console.log('=== SEARCH RESULTS RECEIVED ===');
+          console.log('Data type:', typeof data);
+          console.log('Data:', data);
+          console.log('Data length:', Array.isArray(data) ? data.length : 'N/A');
+          
+          window.lastSearchResults = data;
+          if (typeof viewManager !== 'undefined') {
+            console.log('Calling viewManager.renderResults');
+            viewManager.renderResults(data);
+          } else {
+            console.error('View manager not available');
+          }
+        }).catch(e => {
+          console.error('=== SEARCH ERROR ===');
+          console.error('Search error:', e);
+          console.error('Error message:', e.message);
+          console.error('Error stack:', e.stack);
+          
+          window.lastSearchResults = [];
+          if (typeof viewManager !== 'undefined') {
+            viewManager.renderResults([]);
+          } else {
+            console.error('View manager not available for error rendering');
+          }
+          
+          // Afficher un message d'erreur détaillé
+          if (resultsContainer) {
+            resultsContainer.innerHTML = `
+              <div class="text-center p-4">
+                <p class="text-red-500 mb-2">Erreur lors de la recherche</p>
+                <p class="text-sm opacity-70">${e.message}</p>
+                <button onclick="navigation.performSearch()" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
+                  Réessayer
+                </button>
+              </div>
+            `;
+          } else {
+            // Si le conteneur n'existe pas, créer une alerte
+            console.error('Results container not found for error display');
+            alert(`Erreur lors de la recherche: ${e.message}`);
+          }
+        }).finally(() => {
+          // Cacher le chargement
+          if (searchLoading) {
+            searchLoading.classList.add('hidden');
+            console.log('Hiding loading indicator');
+          }
+        });
+      }, 100); // Délai de 100ms pour s'assurer que le DOM est prêt
+    },
+    
+    initializePopularPage() {
+      // Re-initialize popular books functionality if it exists
+      if (typeof homeSections !== 'undefined') {
+        console.log('Initializing popular page...');
+        
+        // Make sure DOM elements exist before trying to use them
+        const initWithRetry = (retryCount = 0) => {
+          setTimeout(() => {
+            try {
+              // Check if required elements exist
+              const container = document.getElementById('popular-books-container');
+              const loading = document.getElementById('popular-books-loading');
+              const noBooks = document.getElementById('no-popular-books');
+              
+              console.log('Popular page elements check:', {
+                container: !!container,
+                loading: !!loading,
+                noBooks: !!noBooks,
+                retryCount
+              });
+              
+              if (!container || !loading) {
+                console.warn('Popular page elements not found, retrying...');
+                if (retryCount < 3) {
+                  initWithRetry(retryCount + 1);
+                } else {
+                  console.error('Failed to initialize popular page after 3 retries');
+                  this.showPopularPageError();
+                }
+                return;
+              }
+              
+              // Initialize view toggle buttons first
+              homeSections.initPopularViewToggle();
+              
+              // Fetch popular books immediately
+              console.log('Initializing popular page, fetching books...');
+              homeSections.fetchPopularBooks();
+              
+              // Re-bind refresh button
+              const refreshBtn = document.getElementById('refresh-popular');
+              if (refreshBtn) {
+                // Remove existing listeners to avoid duplicates
+                refreshBtn.replaceWith(refreshBtn.cloneNode(true));
+                const newRefreshBtn = document.getElementById('refresh-popular');
+                newRefreshBtn.addEventListener('click', () => {
+                  console.log('Refresh button clicked, fetching popular books...');
+                  homeSections.fetchPopularBooks(true);
+                });
+              }
+              
+              // Set up a timeout to check if loading is stuck
+              setTimeout(() => {
+                if (loading && !loading.classList.contains('hidden')) {
+                  console.warn('Popular books loading seems stuck, retrying...');
+                  homeSections.fetchPopularBooks();
+                }
+              }, 5000);
+              
+            } catch (error) {
+              console.error('Error initializing popular page:', error);
+              if (retryCount < 3) {
+                initWithRetry(retryCount + 1);
+              } else {
+                this.showPopularPageError();
+              }
+            }
+          }, 100 + (retryCount * 200)); // Increasing delay with each retry
+        };
+        
+        initWithRetry();
+      } else {
+        console.error('homeSections object not available for popular page initialization');
+      }
+    },
+    
+    showPopularPageError() {
+      const container = document.getElementById('popular-books-container');
+      const loading = document.getElementById('popular-books-loading');
+      
+      if (loading) loading.classList.add('hidden');
+      
+      if (container) {
+        container.innerHTML = `
+          <div class="text-center py-8">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-red-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-lg font-medium mb-2">Erreur lors du chargement des livres populaires</p>
+            <p class="text-sm opacity-70 mb-4">Veuillez réessayer plus tard</p>
+            <button onclick="navigation.initializePopularPage(); return false;" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md">
+              Réessayer
+            </button>
+          </div>
+        `;
+      }
+    },
+    
+    loadInitialState() {
+      console.log('=== loadInitialState called ===');
+      console.log('Current URL:', window.location.href);
+      console.log('Current hash:', window.location.hash);
+      
+      // Load sidebar collapsed state
+      const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+      if (isCollapsed) {
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+          sidebar.classList.add('collapsed');
+          this.isSidebarCollapsed = true;
+        }
+      }
+      
+      // Déterminer la page depuis l'URL
+      let page = 'home';
+      const hash = window.location.hash.substring(1); // Enlever le #
+      
+      if (hash === 'search' || hash === 'popular') {
+        page = hash;
+        console.log(`Hash detected: ${hash}, setting page to: ${page}`);
+      } else {
+        // Determine current page from URL path (pour les accès directs)
+        const path = window.location.pathname;
+        
+        if (path.includes('/search')) {
+          page = 'search';
+        } else if (path.includes('/popular')) {
+          page = 'popular';
+        }
+        
+        // Vérifier si nous sommes sur une page directe (/search ou /popular)
+        // et si le contenu affiché est du JSON brut
+        if (page !== 'home') {
+          // Vérifier si le corps de la page contient du JSON
+          const bodyText = document.body.textContent || document.body.innerText;
+          if (bodyText.trim().startsWith('{') && bodyText.includes('"content"')) {
+            // Nous sommes sur une page JSON brute, rediriger vers la page d'accueil
+            // puis naviguer vers la page appropriée
+            console.log('Detected raw JSON page, redirecting to SPA navigation');
+            window.location.href = '/#' + page;
+            return;
+          }
+        }
+      }
+      
+      console.log(`Initial page determined: ${page}`);
+      
+      // IMMÉDIATEMENT masquer la page d'accueil si nous ne sommes pas sur home
+      // C'est crucial pour éviter le flash lors du rafraîchissement
+      if (page !== 'home') {
+        const homePage = document.getElementById('home-page');
+        if (homePage) {
+          homePage.classList.add('hidden');
+          console.log('Home page hidden immediately');
+        }
+      }
+      
+      this.currentPage = page;
+      this.updateActiveMenuItem(page);
+      
+      // Si nous ne sommes pas sur la page d'accueil, charger le contenu approprié IMMÉDIATEMENT
+      if (page !== 'home') {
+        console.log(`Loading initial page: ${page}`);
+        // Utiliser une approche directe pour éviter tout délai
+        this.handleInitialPageLoad(page);
+      } else {
+        // Pour la page d'accueil, s'assurer qu'elle est visible et masquer les autres
+        console.log('Setting up home page');
+        const homePage = document.getElementById('home-page');
+        if (homePage) {
+          homePage.classList.remove('hidden');
+        }
+        // Masquer les autres pages
+        const searchPage = document.getElementById('search-page');
+        const popularPage = document.getElementById('popular-page');
+        if (searchPage) searchPage.classList.add('hidden');
+        if (popularPage) popularPage.classList.add('hidden');
+      }
+      
+      // Handle browser back/forward
+      window.addEventListener('popstate', (e) => {
+        console.log('Popstate event detected:', e.state);
+        if (e.state && e.state.page) {
+          this.navigateToPage(e.state.page, window.location.pathname);
+        } else {
+          // Gérer le cas où l'état est vide (rafraîchissement de page avec hash)
+          const currentHash = window.location.hash.substring(1);
+          const currentPath = window.location.pathname;
+          let currentPage = 'home';
+          let currentUrl = '/';
+          
+          if (currentHash === 'search') {
+            currentPage = 'search';
+            currentUrl = '/#search';
+          } else if (currentHash === 'popular') {
+            currentPage = 'popular';
+            currentUrl = '/#popular';
+          } else if (currentPath.includes('/search')) {
+            currentPage = 'search';
+            currentUrl = '/search';
+          } else if (currentPath.includes('/popular')) {
+            currentPage = 'popular';
+            currentUrl = '/popular';
+          }
+          
+          console.log('Navigating to page from popstate:', currentPage, currentUrl);
+          this.navigateToPage(currentPage, currentUrl);
+        }
+      });
+      
+      // Handle hash changes
+      window.addEventListener('hashchange', () => {
+        const newHash = window.location.hash.substring(1);
+        console.log('Hash change detected:', newHash);
+        
+        // Éviter les navigations en double
+        if (newHash === this.currentPage) {
+          console.log('Already on this page, skipping navigation');
+          return;
+        }
+        
+        if (newHash === 'search' || newHash === 'popular') {
+          const hashUrl = '/#' + newHash;
+          this.navigateToPage(newHash, hashUrl);
+        } else if (newHash === '' || newHash === 'home') {
+          this.navigateToPage('home', '/');
+        }
+      });
+    },
+
+    async handleInitialPageLoad(page) {
+      console.log(`=== handleInitialPageLoad called for: ${page} ===`);
+      
+      try {
+        // Masquer toutes les pages sauf la cible
+        const allPages = document.querySelectorAll('[id$="-page"]');
+        for (const pageEl of allPages) {
+          pageEl.classList.add('hidden');
+        }
+        
+        // Afficher la page cible
+        const targetPage = document.getElementById(`${page}-page`);
+        if (!targetPage) {
+          throw new Error(`Target page container not found: #${page}-page`);
+        }
+        targetPage.classList.remove('hidden');
+        console.log(`Target page ${page}-page shown`);
+        
+        // Charger le contenu
+        await this.loadPageContent(page);
+        
+        // Initialiser les fonctionnalités de la page
+        setTimeout(() => {
+          this.initializePage(page);
+        }, 50);
+        
+        // Mettre à jour l'historique du navigateur
+        if (page === 'home') {
+          history.pushState({ page }, '', '/');
+        } else {
+          const hashUrl = '/#' + page;
+          history.pushState({ page }, '', hashUrl);
+        }
+        
+        console.log(`Initial page ${page} loaded successfully`);
+        
+      } catch (error) {
+        console.error('Error in handleInitialPageLoad:', error);
+        
+        // Afficher un message d'erreur dans la page cible
+        const targetPage = document.getElementById(`${page}-page`);
+        if (targetPage) {
+          targetPage.innerHTML = `
+            <div class="text-center py-8">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-red-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p class="text-lg font-medium mb-2">Erreur lors du chargement de la page</p>
+              <p class="text-sm opacity-70 mb-4">Veuillez réessayer plus tard</p>
+              <button onclick="navigation.handleInitialPageLoad('${page}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md">
+                Réessayer
+              </button>
+            </div>
+          `;
+        }
+      }
+    },
+    
+  };
+
   // ---- Browser Compatibility Detection ----
   const compatibility = {
     // Detect CSS feature support
@@ -302,49 +1275,110 @@
     show(node) { node && node.classList.remove('hidden'); },
     hide(node) { node && node.classList.add('hidden'); },
     async j(url, opts = {}) {
-      const res = await fetch(url, opts);
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      console.log('=== UTILS.J FETCH ===');
+      console.log('URL:', url);
+      console.log('Options:', opts);
       
       try {
-        return await res.json();
-      } catch (e) {
-        // Fallback pour les réponses non-JSON
-        const text = await res.text();
-        if (text.trim() === '') {
-          return null; // Pour les réponses 204
+        const res = await fetch(url, opts);
+        console.log('Response status:', res.status);
+        console.log('Response statusText:', res.statusText);
+        console.log('Response headers:', Object.fromEntries(res.headers.entries()));
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('Response error text:', errorText);
+          throw new Error(`${res.status} ${res.statusText}: ${errorText}`);
         }
-        // Tenter de parser manuellement
+        
         try {
-          return JSON.parse(text);
-        } catch {
-          return { text }; // Retourner le texte dans un objet
+          const data = await res.json();
+          console.log('JSON response received successfully');
+          console.log('Response data type:', typeof data);
+          console.log('Is array:', Array.isArray(data));
+          console.log('Data length:', Array.isArray(data) ? data.length : 'N/A');
+          return data;
+        } catch (e) {
+          console.log('Failed to parse JSON, trying fallback');
+          // Fallback pour les réponses non-JSON
+          const text = await res.text();
+          console.log('Raw response text:', text);
+          
+          if (text.trim() === '') {
+            console.log('Empty response, returning null');
+            return null; // Pour les réponses 204
+          }
+          
+          // Tenter de parser manuellement
+          try {
+            const parsedData = JSON.parse(text);
+            console.log('Manual JSON parse successful');
+            return parsedData;
+          } catch (parseError) {
+            console.log('Manual JSON parse failed, returning text in object');
+            console.log('Parse error:', parseError);
+            return { text }; // Retourner le texte dans un objet
+          }
         }
+      } catch (e) {
+        console.error('=== UTILS.J ERROR ===');
+        console.error('Fetch error:', e);
+        console.error('Error message:', e.message);
+        console.error('Error stack:', e.stack);
+        throw e;
       }
     },
     // Build query string from basic + advanced filters
     buildQuery() {
+      console.log('buildQuery called');
+      
+      // Utiliser des références dynamiques pour éviter les erreurs
+      const searchInput = el.searchInput || document.getElementById('search-input');
+      const filtersForm = el.filtersForm || document.getElementById('search-filters');
+      
+      console.log('searchInput:', searchInput);
+      console.log('filtersForm:', filtersForm);
+      
       const q = [];
-      const basic = el.searchInput?.value?.trim();
-      if (basic) q.push(`query=${encodeURIComponent(basic)}`);
+      const basic = searchInput?.value?.trim();
+      console.log('Basic search input value:', basic);
+      
+      if (basic) {
+        q.push(`query=${encodeURIComponent(basic)}`);
+        console.log('Added basic query:', `query=${encodeURIComponent(basic)}`);
+      }
 
-      if (!el.filtersForm || el.filtersForm.classList.contains('hidden')) {
+      if (!filtersForm || filtersForm.classList.contains('hidden')) {
+        console.log('Filters form is hidden or not available, returning basic query');
         return q.join('&');
       }
 
+      console.log('Processing advanced filters...');
       FILTERS.forEach((name) => {
         if (name === 'format') {
           const checked = Array.from(document.querySelectorAll('[id^="format-"]:checked'));
-          checked.forEach((cb) => q.push(`format=${encodeURIComponent(cb.value)}`));
+          console.log(`Format checkboxes checked:`, checked);
+          checked.forEach((cb) => {
+            q.push(`format=${encodeURIComponent(cb.value)}`);
+            console.log('Added format filter:', `format=${encodeURIComponent(cb.value)}`);
+          });
         } else {
           const input = document.querySelectorAll(`[id^="${name}-input"]`);
+          console.log(`Filter inputs for ${name}:`, input);
           input.forEach((node) => {
             const val = node.value?.trim();
-            if (val) q.push(`${name}=${encodeURIComponent(val)}`);
+            console.log(`Value for ${name}:`, val);
+            if (val) {
+              q.push(`${name}=${encodeURIComponent(val)}`);
+              console.log('Added filter:', `${name}=${encodeURIComponent(val)}`);
+            }
           });
         }
       });
 
-      return q.join('&');
+      const result = q.join('&');
+      console.log('Final query string:', result);
+      return result;
     },
     // Simple notification via alert fallback
     toast(msg) { try { console.info(msg); } catch (_) {} },
@@ -366,10 +1400,24 @@
       `<div class="w-full h-88 rounded flex items-center justify-center opacity-70" style="background: var(--bg-soft)">No Cover</div>`;
 
     // Pour les livres Apple Books, utiliser les informations disponibles
-    const year = book.year || book.releaseDate || '-';
-    const language = book.language || '-';
-    const format = book.format || '-';
+    // Extraire uniquement l'année de la date complète
+    const getYearOnly = (dateStr) => {
+      if (!dateStr || dateStr === '-') return '';
+      const yearMatch = dateStr.match(/(\d{4})/);
+      return yearMatch ? yearMatch[1] : '';
+    };
+    
+    const year = getYearOnly(book.year || book.releaseDate);
+    const language = book.language || '';
+    const format = book.format || '';
     const size = book.size || '';
+
+    // Construire les métadonnées avec des séparateurs conditionnels
+    const metadata = [];
+    if (year) metadata.push(year);
+    if (language) metadata.push(language);
+    if (format) metadata.push(format);
+    if (size) metadata.push(size);
 
     const html = `
       <article class="rounded border p-3 flex flex-col gap-3 ${isAppleBook ? 'apple-book-card' : ''}" style="border-color: var(--border-muted); background: var(--bg-soft)">
@@ -378,12 +1426,7 @@
           <h3 class="font-semibold leading-tight">${utils.e(book.title) || 'Untitled'}</h3>
           <p class="text-sm opacity-80">${utils.e(book.author) || 'Unknown author'}</p>
           <div class="text-xs opacity-70 flex flex-wrap gap-2">
-            <span>${utils.e(year)}</span>
-            <span>•</span>
-            <span>${utils.e(language)}</span>
-            <span>•</span>
-            <span>${utils.e(format)}</span>
-            ${size ? `<span>•</span><span>${utils.e(size)}</span>` : ''}
+            ${metadata.map((item, index) => `<span>${utils.e(item)}</span>${index < metadata.length - 1 ? '<span>•</span>' : ''}`).join('')}
           </div>
         </div>
         <div class="flex gap-2">
@@ -405,7 +1448,7 @@
     
     if (searchBtn) {
       searchBtn.addEventListener('click', () => {
-        homeSections.searchForAppleBook(book.title);
+        homeSections.searchForAppleBook(book.title, book.author);
       });
     }
     
@@ -500,7 +1543,7 @@
     
     // Fonction pour nettoyer les dates (prendre seulement la première année)
     const cleanYear = (year) => {
-      if (!year) return '-';
+      if (!year) return '';
       
       // Si l'année contient plusieurs années concaténées, prendre la première
       const yearMatch = year.match(/(\d{4})/);
@@ -508,7 +1551,7 @@
         return yearMatch[1];
       }
       
-      return year;
+      return '';
     };
     
     // Cellule Preview
@@ -571,7 +1614,7 @@
     // Cellule Year
     const yearCell = document.createElement('td');
     yearCell.className = 'p-3';
-    yearCell.textContent = utils.e(book.year) || '-';
+    yearCell.textContent = cleanYear(book.year) || '-';
     
     // Cellule Language
     const languageCell = document.createElement('td');
@@ -637,9 +1680,17 @@
       this.currentView = savedView;
       this.updateViewButtons();
       
-      // Bind events
-      el.viewGridBtn?.addEventListener('click', () => this.setView(VIEW_MODES.GRID));
-      el.viewListBtn?.addEventListener('click', () => this.setView(VIEW_MODES.LIST));
+      // Bind events - utiliser des références dynamiques pour éviter les erreurs
+      const viewGridBtn = el.viewGridBtn || document.getElementById('view-grid');
+      const viewListBtn = el.viewListBtn || document.getElementById('view-list');
+      
+      if (viewGridBtn) {
+        viewGridBtn.addEventListener('click', () => this.setView(VIEW_MODES.GRID));
+      }
+      
+      if (viewListBtn) {
+        viewListBtn.addEventListener('click', () => this.setView(VIEW_MODES.LIST));
+      }
     },
     
     setView(viewMode) {
@@ -665,9 +1716,25 @@
       });
       
       // Mettre à jour les classes du conteneur
-      if (el.resultsContainer) {
-        el.resultsContainer.classList.remove('grid-view', 'list-view');
-        el.resultsContainer.classList.add(`${this.currentView}-view`);
+      let resultsContainer = el.resultsContainer;
+      if (!resultsContainer) {
+        // Essayer de rafraîchir les éléments si el.resultsContainer est null
+        if (typeof navigation !== 'undefined' && navigation.refreshSearchElements) {
+          navigation.refreshSearchElements();
+          resultsContainer = el.resultsContainer;
+        }
+        
+        // Si toujours null, essayer de récupérer directement
+        if (!resultsContainer) {
+          resultsContainer = document.getElementById('results-container');
+        }
+      }
+      
+      if (resultsContainer) {
+        resultsContainer.classList.remove('grid-view', 'list-view');
+        resultsContainer.classList.add(`${this.currentView}-view`);
+      } else {
+        console.error('Results container not found in updateViewButtons');
       }
     },
     
@@ -680,81 +1747,404 @@
     },
     
     renderGrid(books) {
-      // Utiliser la fonction renderCards existante mais avec resultsContainer
-      el.resultsContainer.innerHTML = '';
-      if (!books || books.length === 0) {
-        utils.show(el.noResults);
-        return;
+      try {
+        // Vérifier que resultsContainer existe
+        if (!el.resultsContainer) {
+          console.error('Results container not found in renderGrid, refreshing elements...');
+          // Tenter de rafraîchir les éléments
+          if (typeof navigation !== 'undefined' && navigation.refreshSearchElements) {
+            navigation.refreshSearchElements();
+          }
+          
+          // Si toujours null, essayer de récupérer directement
+          el.resultsContainer = document.getElementById('results-container');
+          if (!el.resultsContainer) {
+            console.error('Results container still not found after refresh');
+            return;
+          }
+        }
+        
+        // Masquer les états de chargement avant de commencer le rendu
+        const searchLoading = el.searchLoading || document.getElementById('search-loading');
+        if (searchLoading) {
+          searchLoading.classList.add('hidden');
+          searchLoading.style.display = 'none';
+        }
+        
+        // S'assurer que le conteneur est vide avant d'ajouter du contenu
+        el.resultsContainer.innerHTML = '';
+        
+        // Nettoyer les éléments optimistes qui pourraient encore être présents
+        this.cleanupOptimisticElements(el.resultsContainer);
+        
+        // Vérifier si nous avons des livres à afficher
+        if (!books || books.length === 0) {
+          // Masquer le conteneur s'il n'y a pas de résultats pour éviter le cadre vide
+          el.resultsContainer.style.display = 'none';
+          el.resultsContainer.classList.add('empty-container');
+          if (el.noResults) {
+            utils.show(el.noResults);
+            el.noResults.style.display = '';
+          }
+          return;
+        }
+        
+        // Afficher le conteneur et masquer le message "no results"
+        el.resultsContainer.style.display = '';
+        el.resultsContainer.classList.remove('empty-container');
+        if (el.noResults) {
+          utils.hide(el.noResults);
+          el.noResults.style.display = 'none';
+        }
+        
+        // Créer et ajouter les éléments de manière efficace
+        const frag = document.createDocumentFragment();
+        let validCards = 0;
+        
+        books.forEach((b) => {
+          try {
+            const card = renderCard(b);
+            if (card) {
+              frag.appendChild(card);
+              validCards++;
+            }
+          } catch (error) {
+            console.error('Error rendering card for book:', b, error);
+          }
+        });
+        
+        // N'ajouter le contenu que s'il y a des éléments valides
+        if (validCards > 0) {
+          el.resultsContainer.appendChild(frag);
+          el.resultsContainer.classList.remove('empty-container');
+        } else {
+          // Si aucun élément valide n'a été créé, masquer le conteneur
+          el.resultsContainer.style.display = 'none';
+          el.resultsContainer.classList.add('empty-container');
+          if (el.noResults) {
+            utils.show(el.noResults);
+            el.noResults.style.display = '';
+          }
+        }
+      } catch (error) {
+        console.error('Error in renderGrid:', error);
+        // En cas d'erreur, masquer le conteneur et afficher le message d'erreur
+        if (el.resultsContainer) {
+          el.resultsContainer.style.display = 'none';
+          el.resultsContainer.classList.add('empty-container');
+        }
+        if (el.noResults) {
+          utils.show(el.noResults);
+          el.noResults.style.display = '';
+        }
       }
-      utils.hide(el.noResults);
-      const frag = document.createDocumentFragment();
-      books.forEach((b) => frag.appendChild(renderCard(b)));
-      el.resultsContainer.appendChild(frag);
     },
     
     renderList(books) {
-      el.resultsContainer.innerHTML = '';
-      if (!books || books.length === 0) {
-        utils.show(el.noResults);
-        return;
+      try {
+        // Vérifier que resultsContainer existe
+        if (!el.resultsContainer) {
+          console.error('Results container not found in renderList, refreshing elements...');
+          // Tenter de rafraîchir les éléments
+          if (typeof navigation !== 'undefined' && navigation.refreshSearchElements) {
+            navigation.refreshSearchElements();
+          }
+          
+          // Si toujours null, essayer de récupérer directement
+          el.resultsContainer = document.getElementById('results-container');
+          if (!el.resultsContainer) {
+            console.error('Results container still not found after refresh');
+            return;
+          }
+        }
+        
+        // Masquer les états de chargement avant de commencer le rendu
+        const searchLoading = el.searchLoading || document.getElementById('search-loading');
+        if (searchLoading) {
+          searchLoading.classList.add('hidden');
+          searchLoading.style.display = 'none';
+        }
+        
+        // S'assurer que le conteneur est vide avant d'ajouter du contenu
+        el.resultsContainer.innerHTML = '';
+        
+        // Nettoyer les éléments optimistes qui pourraient encore être présents
+        this.cleanupOptimisticElements(el.resultsContainer);
+        
+        // Vérifier si nous avons des livres à afficher
+        if (!books || books.length === 0) {
+          // Masquer le conteneur s'il n'y a pas de résultats pour éviter le cadre vide
+          el.resultsContainer.style.display = 'none';
+          el.resultsContainer.classList.add('empty-container');
+          if (el.noResults) {
+            utils.show(el.noResults);
+            el.noResults.style.display = '';
+          }
+          return;
+        }
+        
+        // Afficher le conteneur et masquer le message "no results"
+        el.resultsContainer.style.display = '';
+        el.resultsContainer.classList.remove('empty-container');
+        if (el.noResults) {
+          utils.hide(el.noResults);
+          el.noResults.style.display = 'none';
+        }
+        
+        // Créer la structure du tableau
+        const table = document.createElement('div');
+        table.className = 'overflow-x-auto';
+        table.innerHTML = `
+          <table class="w-full border-collapse" style="border-color: var(--border-muted);">
+            <thead>
+              <tr style="background: var(--bg-soft);">
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Preview</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Title</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Author</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Publisher</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Year</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Language</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Format</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Size</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="results-tbody">
+              <!-- Les lignes seront injectées ici -->
+            </tbody>
+          </table>
+        `;
+        
+        el.resultsContainer.appendChild(table);
+        const tbody = document.getElementById('results-tbody');
+        
+        // Ajouter chaque livre comme une ligne séparée avec gestion d'erreur
+        let validRows = 0;
+        books.forEach((book) => {
+          try {
+            const row = renderListItem(book);
+            if (row) {
+              tbody.appendChild(row);
+              validRows++;
+            }
+          } catch (error) {
+            console.error('Error rendering list item for book:', book, error);
+          }
+        });
+        
+        // Si aucune ligne valide n'a été créée, masquer le conteneur
+        if (validRows === 0) {
+          el.resultsContainer.style.display = 'none';
+          el.resultsContainer.classList.add('empty-container');
+          if (el.noResults) {
+            utils.show(el.noResults);
+            el.noResults.style.display = '';
+          }
+        } else {
+          el.resultsContainer.classList.remove('empty-container');
+        }
+      } catch (error) {
+        console.error('Error in renderList:', error);
+        // En cas d'erreur, masquer le conteneur et afficher le message d'erreur
+        if (el.resultsContainer) {
+          el.resultsContainer.style.display = 'none';
+          el.resultsContainer.classList.add('empty-container');
+        }
+        if (el.noResults) {
+          utils.show(el.noResults);
+          el.noResults.style.display = '';
+        }
       }
-      utils.hide(el.noResults);
+    },
+    
+    // Méthode pour nettoyer les éléments optimistes
+    cleanupOptimisticElements(container) {
+      if (!container) return;
       
-      // Créer la structure du tableau
-      const table = document.createElement('div');
-      table.className = 'overflow-x-auto';
-      table.innerHTML = `
-        <table class="w-full border-collapse" style="border-color: var(--border-muted);">
-          <thead>
-            <tr style="background: var(--bg-soft);">
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Preview</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Title</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Author</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Publisher</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Year</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Language</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Format</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Size</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="results-tbody">
-            <!-- Les lignes seront injectées ici -->
-          </tbody>
-        </table>
-      `;
-      
-      el.resultsContainer.appendChild(table);
-      const tbody = document.getElementById('results-tbody');
-      
-      // Ajouter chaque livre comme une ligne séparée
-      books.forEach((book) => {
-        const row = renderListItem(book);
-        tbody.appendChild(row);
-      });
+      try {
+        // Nettoyer les éléments optimistes qui pourraient encore être présents
+        const optimisticElements = container.querySelectorAll('.optimistic-item, [data-optimistic-id]');
+        
+        if (optimisticElements.length > 0) {
+          console.log(`Cleaning up ${optimisticElements.length} optimistic elements`);
+          
+          optimisticElements.forEach(element => {
+            // Ajouter une animation de disparition
+            element.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
+            element.style.opacity = '0';
+            element.style.transform = 'scale(0.95)';
+            
+            // Supprimer après l'animation
+            setTimeout(() => {
+              if (element.parentNode) {
+                element.parentNode.removeChild(element);
+              }
+            }, 200);
+          });
+          
+          // Forcer le nettoyage après un délai plus long au cas où l'animation échouerait
+          setTimeout(() => {
+            const remainingElements = container.querySelectorAll('.optimistic-item, [data-optimistic-id]');
+            remainingElements.forEach(element => {
+              if (element.parentNode) {
+                element.parentNode.removeChild(element);
+              }
+            });
+          }, 500);
+        }
+        
+        // Nettoyer également les conteneurs vides qui pourraient rester
+        const emptyContainers = container.querySelectorAll('.empty-container');
+        emptyContainers.forEach(element => {
+          element.style.display = 'none';
+        });
+        
+      } catch (error) {
+        console.error('Error in cleanupOptimisticElements:', error);
+        // En cas d'erreur, forcer le nettoyage immédiat
+        try {
+          const optimisticElements = container.querySelectorAll('.optimistic-item, [data-optimistic-id]');
+          optimisticElements.forEach(element => {
+            if (element.parentNode) {
+              element.parentNode.removeChild(element);
+            }
+          });
+        } catch (cleanupError) {
+          console.error('Error in emergency cleanup:', cleanupError);
+        }
+      }
     }
   };
 
   // ---- Search ----
   const search = {
     async run() {
-      const qs = utils.buildQuery();
-      if (!qs) {
-        window.lastSearchResults = [];
-        viewManager.renderResults([]);
-        return;
-      }
-      utils.show(el.searchLoading);
-      try {
-        const data = await utils.j(`${API.search}?${qs}`);
-        window.lastSearchResults = data; // Stocker pour le changement de vue
-        viewManager.renderResults(data);
-      } catch (e) {
-        window.lastSearchResults = [];
-        viewManager.renderResults([]);
-      } finally {
-        utils.hide(el.searchLoading);
-      }
+      console.log('=== SEARCH.RUN CALLED ===');
+      
+      // Ajouter un petit délai pour s'assurer que le DOM est prêt
+      return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+          try {
+            const qs = utils.buildQuery();
+            console.log('Query string from buildQuery:', qs);
+            
+            if (!qs) {
+              console.log('Empty query string in search.run()');
+              window.lastSearchResults = [];
+              if (typeof viewManager !== 'undefined') {
+                viewManager.renderResults([]);
+              } else {
+                console.error('viewManager not available in search.run()');
+              }
+              resolve();
+              return;
+            }
+            
+            // Afficher le chargement
+            if (el.searchLoading) {
+              utils.show(el.searchLoading);
+              console.log('Showing search loading indicator');
+            } else {
+              console.warn('searchLoading element not found');
+            }
+            
+            const searchUrl = `${API.search}?${qs}`;
+            console.log('Fetching search results from:', searchUrl);
+            
+            // Afficher un message de débogage dans le conteneur de résultats
+            let resultsContainer = el.resultsContainer;
+            if (!resultsContainer) {
+              // Essayer de rafraîchir les éléments si el.resultsContainer est null
+              if (typeof navigation !== 'undefined' && navigation.refreshSearchElements) {
+                navigation.refreshSearchElements();
+                resultsContainer = el.resultsContainer;
+              }
+              
+              // Si toujours null, essayer de récupérer directement
+              if (!resultsContainer) {
+                resultsContainer = document.getElementById('results-container');
+              }
+            }
+            
+            if (resultsContainer) {
+              resultsContainer.innerHTML = '<div class="text-center p-4">Recherche en cours...</div>';
+            } else {
+              console.error('Results container not found in search.run()');
+            }
+            
+            const data = await utils.j(searchUrl);
+            console.log('=== SEARCH.RUN RESULTS ===');
+            console.log('Data type:', typeof data);
+            console.log('Data:', data);
+            console.log('Is array:', Array.isArray(data));
+            console.log('Data length:', Array.isArray(data) ? data.length : 'N/A');
+            
+            window.lastSearchResults = data; // Stocker pour le changement de vue
+            
+            if (typeof viewManager !== 'undefined') {
+              console.log('Calling viewManager.renderResults from search.run()');
+              viewManager.renderResults(data);
+            } else {
+              console.error('viewManager not available in search.run()');
+            }
+            
+            resolve();
+            
+          } catch (e) {
+            console.error('=== SEARCH.RUN ERROR ===');
+            console.error('Error in search.run():', e);
+            console.error('Error message:', e.message);
+            console.error('Error stack:', e.stack);
+            
+            window.lastSearchResults = [];
+            
+            // Afficher un message d'erreur détaillé
+            let resultsContainer = el.resultsContainer;
+            if (!resultsContainer) {
+              // Essayer de rafraîchir les éléments si el.resultsContainer est null
+              if (typeof navigation !== 'undefined' && navigation.refreshSearchElements) {
+                navigation.refreshSearchElements();
+                resultsContainer = el.resultsContainer;
+              }
+              
+              // Si toujours null, essayer de récupérer directement
+              if (!resultsContainer) {
+                resultsContainer = document.getElementById('results-container');
+              }
+            }
+            
+            if (resultsContainer) {
+              resultsContainer.innerHTML = `
+                <div class="text-center p-4">
+                  <p class="text-red-500 mb-2">Erreur lors de la recherche</p>
+                  <p class="text-sm opacity-70">${e.message}</p>
+                  <button onclick="search.run()" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
+                    Réessayer
+                  </button>
+                </div>
+              `;
+            } else {
+              // Si le conteneur n'existe pas, créer une alerte
+              console.error('Results container not found for error display');
+              alert(`Erreur lors de la recherche: ${e.message}`);
+            }
+            
+            if (typeof viewManager !== 'undefined') {
+              viewManager.renderResults([]);
+            } else {
+              console.error('viewManager not available for error rendering in search.run()');
+            }
+            
+            reject(e);
+          } finally {
+            // Cacher le chargement
+            if (el.searchLoading) {
+              utils.hide(el.searchLoading);
+              console.log('Hiding search loading indicator');
+            }
+          }
+        }, 100); // Délai de 100ms pour s'assurer que le DOM est prêt
+      });
     }
   };
 
@@ -785,7 +2175,12 @@
               <p class="text-sm opacity-80">${utils.e(book.author) || 'Unknown author'}</p>
               <div class="text-sm mt-2 space-y-1">
                 <p><strong>Publisher:</strong> ${utils.e(book.publisher) || '-'}</p>
-                <p><strong>Year:</strong> ${utils.e(book.year) || '-'}</p>
+                <p><strong>Year:</strong> ${(() => {
+                  const year = book.year;
+                  if (!year) return '-';
+                  const yearMatch = year.match(/(\d{4})/);
+                  return yearMatch ? yearMatch[1] : '-';
+                })()}</p>
                 <p><strong>Language:</strong> ${utils.e(book.language) || '-'}</p>
                 <p><strong>Format:</strong> ${utils.e(book.format) || '-'}</p>
                 <p><strong>Size:</strong> ${utils.e(book.size) || '-'}</p>
@@ -2122,45 +3517,262 @@
       el.recentDownloadsGrid.appendChild(frag);
     },
     
-    async fetchPopularBooks() {
+    async fetchPopularBooks(forceRefresh = false) {
       try {
         console.log('Fetching popular books...');
-        utils.show(el.popularBooksLoading);
         
-        // Utiliser le nouvel endpoint API pour les livres populaires
-        const popularBooks = await utils.j(`${API.popular}?limit=12`);
-        console.log('Popular books from API:', popularBooks);
+        // S'assurer que les éléments existent
+        const container = document.getElementById('popular-books-container');
+        const loading = document.getElementById('popular-books-loading');
+        const noBooks = document.getElementById('no-popular-books');
         
-        // Stocker les résultats pour le changement de vue
-        window.lastPopularResults = popularBooks;
+        if (!container || !loading) {
+          console.error('Popular books container or loading element not found');
+          return;
+        }
         
-        utils.hide(el.popularBooksLoading);
-        this.renderPopularBooks(popularBooks);
+        // Vérifier le cache en premier (sauf si rafraîchissement forcé)
+        const cacheKey = 'popular-books-cache';
+        const cacheTimestampKey = 'popular-books-cache-timestamp';
+        const cacheTTL = 24 * 60 * 60 * 1000; // 24 heures (1 jour) en millisecondes
+        
+        if (!forceRefresh) {
+          try {
+            const cachedData = localStorage.getItem(cacheKey);
+            const cachedTimestamp = localStorage.getItem(cacheTimestampKey);
+            
+            if (cachedData && cachedTimestamp) {
+              const now = Date.now();
+              const cacheAge = now - parseInt(cachedTimestamp, 10);
+              
+              if (cacheAge < cacheTTL) {
+                console.log('Using cached popular books data, age:', Math.round(cacheAge / 1000), 'seconds');
+                
+                // Utiliser les données du cache
+                const popularBooks = JSON.parse(cachedData);
+                window.lastPopularResults = popularBooks;
+                
+                // Afficher directement les livres depuis le cache
+                this.renderPopularBooks(popularBooks);
+                return;
+              } else {
+                console.log('Cache expired, age:', Math.round(cacheAge / 1000), 'seconds');
+              }
+            }
+          } catch (cacheError) {
+            console.warn('Error reading from cache:', cacheError);
+          }
+        } else {
+          console.log('Force refresh requested, bypassing cache');
+        }
+        
+        // Afficher le chargement uniquement si on va faire une requête réseau
+        loading.classList.remove('hidden');
+        loading.style.display = 'block';
+        if (noBooks) {
+          noBooks.classList.add('hidden');
+          noBooks.style.display = 'none';
+        }
+        
+        try {
+          // Utiliser l'endpoint backend existant pour les livres populaires
+          console.log('Fetching from backend API:', `${API.popular}?limit=25`);
+          const popularBooks = await utils.j(`${API.popular}?limit=25`);
+          console.log('Popular books from backend API:', popularBooks);
+          
+          // Stocker les résultats pour le changement de vue
+          window.lastPopularResults = popularBooks;
+          
+          // Mettre en cache les résultats avec timestamp
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(popularBooks));
+            localStorage.setItem(cacheTimestampKey, Date.now().toString());
+            console.log('Popular books cached successfully');
+          } catch (cacheError) {
+            console.warn('Error caching popular books:', cacheError);
+          }
+          
+          // Cacher le chargement de manière explicite
+          loading.classList.add('hidden');
+          loading.style.display = 'none';
+          
+          // Afficher les livres
+          this.renderPopularBooks(popularBooks);
+          
+        } catch (apiError) {
+          console.error('Error fetching from backend API:', apiError);
+          console.log('Error details:', {
+            message: apiError.message,
+            name: apiError.name,
+            stack: apiError.stack
+          });
+          
+          // En cas d'erreur réseau, essayer d'utiliser le cache même s'il est expiré
+          try {
+            const cachedData = localStorage.getItem(cacheKey);
+            if (cachedData) {
+              console.log('Network error, using expired cache as fallback');
+              const popularBooks = JSON.parse(cachedData);
+              window.lastPopularResults = popularBooks;
+              
+              // Cacher le chargement
+              loading.classList.add('hidden');
+              loading.style.display = 'none';
+              
+              // Afficher les livres depuis le cache avec un message
+              this.renderPopularBooks(popularBooks, true); // Passer un flag pour indiquer l'utilisation du cache expiré
+              return;
+            }
+          } catch (fallbackError) {
+            console.warn('Error using fallback cache:', fallbackError);
+          }
+          
+          // Afficher un message d'erreur détaillé
+          const noBooks = document.getElementById('no-popular-books');
+          if (noBooks) {
+            noBooks.classList.remove('hidden');
+            noBooks.style.display = 'block';
+            
+            let errorMessage = 'Unable to load popular books. Please try again later.';
+            
+            if (apiError.message && apiError.message.includes('404')) {
+              errorMessage = 'Popular books feature not available. Please check back later.';
+            } else if (apiError.message && apiError.message.includes('timeout')) {
+              errorMessage = 'Request timeout. Please try again.';
+            } else if (apiError.message && apiError.message.includes('Failed to fetch')) {
+              errorMessage = 'Network error. Please check your connection and try again.';
+            }
+            
+            noBooks.innerHTML = `
+              <div class="text-center">
+                <p class="mb-2">${errorMessage}</p>
+                <p class="text-xs opacity-60">Error: ${apiError.message}</p>
+                <button onclick="homeSections.fetchPopularBooks()" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
+                  Retry
+                </button>
+              </div>
+            `;
+          }
+          
+          // Cacher le chargement
+          loading.classList.add('hidden');
+          loading.style.display = 'none';
+          
+          throw apiError;
+        }
       } catch (e) {
         console.error('Error fetching popular books:', e);
-        utils.hide(el.popularBooksLoading);
-        utils.show(el.noPopularBooks);
         
-        // Afficher un message plus spécifique en cas d'erreur
-        if (el.noPopularBooks) {
-          if (e.message && e.message.includes('404')) {
-            el.noPopularBooks.innerHTML = 'Popular books feature not available. Please check back later.';
-          } else if (e.message && e.message.includes('timeout')) {
-            el.noPopularBooks.innerHTML = 'Request timeout. Please try again.';
-          } else {
-            el.noPopularBooks.innerHTML = 'Unable to load popular books. Please try again later.';
-          }
+        // Cacher le chargement de manière explicite
+        const loading = document.getElementById('popular-books-loading');
+        if (loading) {
+          loading.classList.add('hidden');
+          loading.style.display = 'none';
         }
+        
+        // L'erreur a déjà été affichée dans le bloc catch ci-dessus
+        // donc nous n'avons pas besoin de l'afficher à nouveau ici
       }
     },
     
-    renderPopularBooks(books) {
-      el.popularBooksContainer.innerHTML = '';
-      if (!books || books.length === 0) {
-        utils.show(el.noPopularBooks);
+    transformAppleBooksData(appleData) {
+      try {
+        console.log('Transforming Apple Books data:', appleData);
+        
+        // Vérifier si les données contiennent des livres
+        if (!appleData || !appleData.books || !Array.isArray(appleData.books)) {
+          console.error('Invalid Apple Books data structure:', appleData);
+          return [];
+        }
+        
+        // Transformer chaque livre d'Apple Books au format attendu
+        const transformedBooks = appleData.books.map((book, index) => {
+          return {
+            id: `apple-book-${index}`,
+            title: book.name || 'Titre inconnu',
+            author: book.artist || 'Auteur inconnu',
+            preview: book.artworkUrl || '',
+            format: 'Apple Books',
+            year: book.releaseDate ? new Date(book.releaseDate).getFullYear().toString() : new Date().getFullYear().toString(),
+            language: 'fr',
+            publisher: book.publisher || 'Éditeur inconnu',
+            size: '', // Apple Books ne fournit pas cette information
+            isAppleBook: true,
+            // Ajouter des informations supplémentaires pour la recherche
+            info: {
+              'Genre': book.genres ? book.genres.join(', ') : 'Non spécifié',
+              'Prix': book.price ? `${book.price} ${book.currency || 'EUR'}` : 'Non spécifié',
+              'Note': book.averageUserRating ? `${book.averageUserRating}/5` : 'Non noté',
+              'URL': book.url || ''
+            }
+          };
+        });
+        
+        console.log('Transformed books:', transformedBooks);
+        return transformedBooks;
+      } catch (error) {
+        console.error('Error transforming Apple Books data:', error);
+        return [];
+      }
+    },
+    
+    renderPopularBooks(books, fromExpiredCache = false) {
+      const container = document.getElementById('popular-books-container');
+      const noBooks = document.getElementById('no-popular-books');
+      
+      if (!container) {
+        console.error('Popular books container not found');
         return;
       }
-      utils.hide(el.noPopularBooks);
+      
+      container.innerHTML = '';
+      if (!books || books.length === 0) {
+        if (noBooks) {
+          noBooks.classList.remove('hidden');
+          noBooks.innerHTML = 'No popular books available.';
+        }
+        return;
+      }
+      
+      if (noBooks) noBooks.classList.add('hidden');
+      
+      // Afficher un message si les données proviennent du cache expiré
+      if (fromExpiredCache) {
+        const cacheNotice = document.createElement('div');
+        cacheNotice.className = 'mb-4 p-3 rounded text-sm';
+        cacheNotice.style.cssText = 'background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); color: rgba(255, 193, 7, 0.9);';
+        cacheNotice.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span>⚠️ Données chargées depuis le cache (connexion indisponible)</span>
+            <button onclick="homeSections.fetchPopularBooks(true)" class="px-2 py-1 rounded text-xs" style="background: rgba(255, 193, 7, 0.2); border: 1px solid rgba(255, 193, 7, 0.4);">
+              Rafraîchir
+            </button>
+          </div>
+        `;
+        container.appendChild(cacheNotice);
+      }
+      
+      // Ajouter les informations sur le cache
+      const cacheInfo = this.getCacheInfo();
+      if (cacheInfo.hasCache) {
+        const cacheInfoDiv = document.createElement('div');
+        cacheInfoDiv.className = 'mb-4 p-2 rounded text-xs';
+        cacheInfoDiv.style.cssText = 'background: var(--bg-soft); border: 1px solid var(--border-muted); color: var(--text-muted);';
+        cacheInfoDiv.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span>📦 Cache: ${cacheInfo.sizeFormatted}, ${this.formatDuration(cacheInfo.age)}${cacheInfo.isExpired ? ' (expiré)' : ''}</span>
+            <div class="flex gap-1">
+              <button onclick="homeSections.clearPopularBooksCache(); homeSections.fetchPopularBooks(true);" class="px-2 py-1 rounded" style="background: var(--bg); border: 1px solid var(--border-muted);" title="Vider le cache">
+                🗑️
+              </button>
+              <button onclick="console.log(homeSections.getCacheInfo());" class="px-2 py-1 rounded" style="background: var(--bg); border: 1px solid var(--border-muted);" title="Afficher les détails du cache dans la console">
+                ℹ️
+              </button>
+            </div>
+          </div>
+        `;
+        container.appendChild(cacheInfoDiv);
+      }
       
       // Utiliser les mêmes fonctions de rendu que la recherche
       this.renderPopularResults(books);
@@ -2184,69 +3796,209 @@
     },
     
     renderPopularGrid(books) {
-      el.popularBooksContainer.innerHTML = '';
-      if (!books || books.length === 0) {
-        utils.show(el.noPopularBooks);
-        return;
+      try {
+        const container = document.getElementById('popular-books-container');
+        const noBooks = document.getElementById('no-popular-books');
+        
+        if (!container) {
+          console.error('Popular books container not found');
+          return;
+        }
+        
+        // Masquer les états de chargement
+        const loading = document.getElementById('popular-books-loading');
+        if (loading) {
+          loading.classList.add('hidden');
+          loading.style.display = 'none';
+        }
+        
+        // S'assurer que le conteneur est vide
+        container.innerHTML = '';
+        
+        // Nettoyer les éléments optimistes
+        viewManager.cleanupOptimisticElements(container);
+        
+        if (!books || books.length === 0) {
+          // Masquer le conteneur s'il n'y a pas de livres
+          container.style.display = 'none';
+          container.classList.add('empty-container');
+          if (noBooks) {
+            noBooks.classList.remove('hidden');
+            noBooks.style.display = '';
+          }
+          return;
+        }
+        
+        // Afficher le conteneur et masquer le message "no books"
+        container.style.display = '';
+        container.classList.remove('empty-container');
+        if (noBooks) {
+          noBooks.classList.add('hidden');
+          noBooks.style.display = 'none';
+        }
+        
+        // Configurer le conteneur pour la vue grille
+        container.classList.remove('list-view');
+        container.classList.add('grid-view');
+        
+        const frag = document.createDocumentFragment();
+        let validCards = 0;
+        
+        books.forEach((book) => {
+          try {
+            const card = renderCard(book);
+            if (card) {
+              frag.appendChild(card);
+              validCards++;
+            }
+          } catch (error) {
+            console.error('Error rendering popular card for book:', book, error);
+          }
+        });
+        
+        // N'ajouter le contenu que s'il y a des éléments valides
+        if (validCards > 0) {
+          container.appendChild(frag);
+          container.classList.remove('empty-container');
+        } else {
+          // Si aucun élément valide n'a été créé, masquer le conteneur
+          container.style.display = 'none';
+          container.classList.add('empty-container');
+          if (noBooks) {
+            noBooks.classList.remove('hidden');
+            noBooks.style.display = '';
+          }
+        }
+      } catch (error) {
+        console.error('Error in renderPopularGrid:', error);
+        // En cas d'erreur, masquer le conteneur et afficher le message d'erreur
+        const container = document.getElementById('popular-books-container');
+        const noBooks = document.getElementById('no-popular-books');
+        
+        if (container) {
+          container.style.display = 'none';
+          container.classList.add('empty-container');
+        }
+        if (noBooks) {
+          noBooks.classList.remove('hidden');
+          noBooks.style.display = '';
+        }
       }
-      utils.hide(el.noPopularBooks);
-      
-      // Configurer le conteneur pour la vue grille
-      el.popularBooksContainer.classList.remove('list-view');
-      el.popularBooksContainer.classList.add('grid-view');
-      
-      const frag = document.createDocumentFragment();
-      books.forEach((book) => {
-        const card = renderCard(book);
-        frag.appendChild(card);
-      });
-      el.popularBooksContainer.appendChild(frag);
     },
     
     renderPopularList(books) {
-      el.popularBooksContainer.innerHTML = '';
-      if (!books || books.length === 0) {
-        utils.show(el.noPopularBooks);
-        return;
+      try {
+        const container = document.getElementById('popular-books-container');
+        const noBooks = document.getElementById('no-popular-books');
+        
+        if (!container) {
+          console.error('Popular books container not found');
+          return;
+        }
+        
+        // Masquer les états de chargement
+        const loading = document.getElementById('popular-books-loading');
+        if (loading) {
+          loading.classList.add('hidden');
+          loading.style.display = 'none';
+        }
+        
+        // S'assurer que le conteneur est vide
+        container.innerHTML = '';
+        
+        // Nettoyer les éléments optimistes
+        viewManager.cleanupOptimisticElements(container);
+        
+        if (!books || books.length === 0) {
+          // Masquer le conteneur s'il n'y a pas de livres
+          container.style.display = 'none';
+          container.classList.add('empty-container');
+          if (noBooks) {
+            noBooks.classList.remove('hidden');
+            noBooks.style.display = '';
+          }
+          return;
+        }
+        
+        // Afficher le conteneur et masquer le message "no books"
+        container.style.display = '';
+        container.classList.remove('empty-container');
+        if (noBooks) {
+          noBooks.classList.add('hidden');
+          noBooks.style.display = 'none';
+        }
+        
+        // Configurer le conteneur pour la vue liste
+        container.classList.remove('grid-view');
+        container.classList.add('list-view');
+        
+        // Créer la structure du tableau
+        const table = document.createElement('div');
+        table.className = 'overflow-x-auto';
+        table.innerHTML = `
+          <table class="w-full border-collapse" style="border-color: var(--border-muted);">
+            <thead>
+              <tr style="background: var(--bg-soft);">
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Preview</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Title</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Author</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Publisher</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Year</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Language</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Format</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Size</th>
+                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="popular-results-tbody">
+              <!-- Les lignes seront injectées ici -->
+            </tbody>
+          </table>
+        `;
+        
+        container.appendChild(table);
+        const tbody = document.getElementById('popular-results-tbody');
+        
+        // Ajouter chaque livre comme une ligne séparée avec gestion d'erreur
+        let validRows = 0;
+        books.forEach((book) => {
+          try {
+            const row = this.createPopularListItem(book);
+            if (row) {
+              tbody.appendChild(row);
+              validRows++;
+            }
+          } catch (error) {
+            console.error('Error rendering popular list item for book:', book, error);
+          }
+        });
+        
+        // Si aucune ligne valide n'a été créée, masquer le conteneur
+        if (validRows === 0) {
+          container.style.display = 'none';
+          container.classList.add('empty-container');
+          if (noBooks) {
+            noBooks.classList.remove('hidden');
+            noBooks.style.display = '';
+          }
+        } else {
+          container.classList.remove('empty-container');
+        }
+      } catch (error) {
+        console.error('Error in renderPopularList:', error);
+        // En cas d'erreur, masquer le conteneur et afficher le message d'erreur
+        const container = document.getElementById('popular-books-container');
+        const noBooks = document.getElementById('no-popular-books');
+        
+        if (container) {
+          container.style.display = 'none';
+          container.classList.add('empty-container');
+        }
+        if (noBooks) {
+          noBooks.classList.remove('hidden');
+          noBooks.style.display = '';
+        }
       }
-      utils.hide(el.noPopularBooks);
-      
-      // Configurer le conteneur pour la vue liste
-      el.popularBooksContainer.classList.remove('grid-view');
-      el.popularBooksContainer.classList.add('list-view');
-      
-      // Créer la structure du tableau
-      const table = document.createElement('div');
-      table.className = 'overflow-x-auto';
-      table.innerHTML = `
-        <table class="w-full border-collapse" style="border-color: var(--border-muted);">
-          <thead>
-            <tr style="background: var(--bg-soft);">
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Preview</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Title</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Author</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Publisher</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Year</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Language</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Format</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Size</th>
-              <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="popular-results-tbody">
-            <!-- Les lignes seront injectées ici -->
-          </tbody>
-        </table>
-      `;
-      
-      el.popularBooksContainer.appendChild(table);
-      const tbody = document.getElementById('popular-results-tbody');
-      
-      // Ajouter chaque livre comme une ligne séparée
-      books.forEach((book) => {
-        const row = this.createPopularListItem(book);
-        tbody.appendChild(row);
-      });
     },
     
     createPopularListItem(book) {
@@ -2259,9 +4011,9 @@
       };
       
       const cleanYear = (year) => {
-        if (!year) return '-';
+        if (!year) return '';
         const yearMatch = year.match(/(\d{4})/);
-        return yearMatch ? yearMatch[1] : year;
+        return yearMatch ? yearMatch[1] : '';
       };
       
       // Cellule Preview
@@ -2300,7 +4052,7 @@
       // Cellule Year
       const yearCell = document.createElement('td');
       yearCell.className = 'p-3';
-      yearCell.textContent = cleanYear(book.year || book.releaseDate);
+      yearCell.textContent = cleanYear(book.year || book.releaseDate) || '-';
       
       // Cellule Language
       const languageCell = document.createElement('td');
@@ -2332,7 +4084,7 @@
       
       if (isAppleBook) {
         actionBtn.addEventListener('click', () => {
-          this.searchForAppleBook(book.title);
+          this.searchForAppleBook(book.title, book.author);
         });
       } else {
         actionBtn.addEventListener('click', () => {
@@ -2409,18 +4161,30 @@
     },
     
     searchForAppleBook(title, author) {
-      // Remplir le champ de recherche avec uniquement le titre
-      if (el.searchInput) {
-        el.searchInput.value = title.trim();
-        
-        // Défiler vers la section de recherche
-        const searchSection = document.getElementById('search-section');
-        if (searchSection) {
-          searchSection.scrollIntoView({ behavior: 'smooth' });
-        }
-        
-        // Lancer la recherche
-        search.run();
+      // Naviguer vers la page de recherche avec le titre comme paramètre
+      if (typeof navigation !== 'undefined') {
+        // Naviguer vers la page de recherche
+        navigation.navigateToPage('search', '/#search').then(() => {
+          // Une fois sur la page de recherche, remplir le champ et lancer la recherche
+          setTimeout(() => {
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+              searchInput.value = title.trim();
+              
+              // Lancer la recherche
+              if (typeof search !== 'undefined' && search.run) {
+                search.run();
+              } else if (typeof navigation !== 'undefined' && navigation.performSearch) {
+                navigation.performSearch();
+              }
+            }
+          }, 200); // Délai pour s'assurer que la page est chargée
+        });
+      } else {
+        // Fallback si navigation n'est pas disponible
+        console.error('Navigation system not available');
+        // Redirection traditionnelle
+        window.location.href = `/#search`;
       }
     },
     
@@ -2438,6 +4202,26 @@
       this.fetchPopularBooks();
     },
     
+    initPopularViewToggle() {
+      // Initialize view toggle buttons for popular books
+      const viewGridBtn = document.getElementById('popular-view-grid');
+      const viewListBtn = document.getElementById('popular-view-list');
+      
+      if (viewGridBtn) {
+        viewGridBtn.addEventListener('click', () => {
+          console.log('Grid view button clicked');
+          this.setPopularView('grid');
+        });
+      }
+      
+      if (viewListBtn) {
+        viewListBtn.addEventListener('click', () => {
+          console.log('List view button clicked');
+          this.setPopularView('list');
+        });
+      }
+    },
+
     setPopularView(viewMode) {
       // Mettre à jour les boutons
       document.querySelectorAll('#popular-view-toggle-container .view-toggle').forEach(btn => {
@@ -2451,17 +4235,95 @@
       // Re-render les résultats avec la nouvelle vue
       const currentData = window.lastPopularResults || [];
       this.renderPopularResults(currentData);
+    },
+    
+    clearPopularBooksCache() {
+      try {
+        localStorage.removeItem('popular-books-cache');
+        localStorage.removeItem('popular-books-cache-timestamp');
+        console.log('Popular books cache cleared successfully');
+        return true;
+      } catch (error) {
+        console.error('Error clearing popular books cache:', error);
+        return false;
+      }
+    },
+    
+    getCacheInfo() {
+      try {
+        const cachedData = localStorage.getItem('popular-books-cache');
+        const cachedTimestamp = localStorage.getItem('popular-books-cache-timestamp');
+        
+        if (cachedData && cachedTimestamp) {
+          const now = Date.now();
+          const cacheAge = now - parseInt(cachedTimestamp, 10);
+          const cacheSize = new Blob([cachedData]).size;
+          
+          return {
+            hasCache: true,
+            age: Math.round(cacheAge / 1000), // en secondes
+            size: cacheSize, // en octets
+            sizeFormatted: this.formatBytes(cacheSize),
+            isExpired: cacheAge >= (60 * 60 * 1000) // 1 heure
+          };
+        } else {
+          return {
+            hasCache: false,
+            age: 0,
+            size: 0,
+            sizeFormatted: '0 B',
+            isExpired: false
+          };
+        }
+      } catch (error) {
+        console.error('Error getting cache info:', error);
+        return {
+          hasCache: false,
+          age: 0,
+          size: 0,
+          sizeFormatted: '0 B',
+          isExpired: false,
+          error: error.message
+        };
+      }
+    },
+    
+    formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    },
+    
+    formatDuration(seconds) {
+      if (seconds < 60) {
+        return `${seconds}s`;
+      } else if (seconds < 3600) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+      } else {
+        const hours = Math.floor(seconds / 3600);
+        const remainingMinutes = Math.floor((seconds % 3600) / 60);
+        return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+      }
     }
   };
 
   // ---- Init ----
   compatibility.init(); // Initialize compatibility checks first
   compatibility.initDynamicWillChange(); // Initialize performance manager
+  navigation.init(); // Initialize navigation system
   theme.init();
   viewManager.init(); // Initialize view manager
   homeSections.init(); // Initialize home sections
   sidebar.init();
   initEvents();
   initCoverZoomEvents(); // Initialize cover zoom events
+  
+  // Make navigation globally available
+  window.navigation = navigation;
+  
   // status.fetch(); // Supprimé pour éviter les requêtes inutiles au chargement
 })();

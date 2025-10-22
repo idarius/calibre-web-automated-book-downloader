@@ -9,6 +9,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash
 from werkzeug.wrappers import Response
 from flask import url_for as flask_url_for
+from typing import Union, Tuple
 import typing
 
 from logger import setup_logger
@@ -101,17 +102,61 @@ def url_for_with_request(endpoint : str, **values : typing.Any) -> str:
 @login_required
 def index() -> str:
     """
-    Render main page with search and status table.
+    Render main page with minimal home content.
     """
-    return render_template('index.html', 
-                           book_languages=_SUPPORTED_BOOK_LANGUAGE, 
-                           default_language=BOOK_LANGUAGE, 
+    return render_template('index.html',
+                           book_languages=_SUPPORTED_BOOK_LANGUAGE,
+                           default_language=BOOK_LANGUAGE,
                            supported_formats=SUPPORTED_FORMATS,
                            debug=DEBUG,
                            build_version=BUILD_VERSION,
                            release_version=RELEASE_VERSION,
                            app_env=APP_ENV
                            )
+
+@app.route('/search')
+@login_required
+def search() -> Union[Response, Tuple[Response, int]]:
+    """
+    Return search page fragment for SPA navigation.
+    """
+    try:
+        # Return the search template as a fragment
+        search_content = render_template('search.html',
+                               book_languages=_SUPPORTED_BOOK_LANGUAGE,
+                               default_language=BOOK_LANGUAGE,
+                               supported_formats=SUPPORTED_FORMATS,
+                               debug=DEBUG,
+                               build_version=BUILD_VERSION,
+                               release_version=RELEASE_VERSION,
+                               app_env=APP_ENV
+                               )
+        return jsonify({"content": search_content})
+    except Exception as e:
+        logger.error_trace(f"Search fragment error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/popular')
+@login_required
+def popular() -> Union[Response, Tuple[Response, int]]:
+    """
+    Return popular books page fragment for SPA navigation.
+    """
+    try:
+        # Return the popular template as a fragment
+        popular_content = render_template('popular.html',
+                               book_languages=_SUPPORTED_BOOK_LANGUAGE,
+                               default_language=BOOK_LANGUAGE,
+                               supported_formats=SUPPORTED_FORMATS,
+                               debug=DEBUG,
+                               build_version=BUILD_VERSION,
+                               release_version=RELEASE_VERSION,
+                               app_env=APP_ENV
+                               )
+        return jsonify({"content": popular_content})
+    except Exception as e:
+        logger.error_trace(f"Popular fragment error: {e}")
+        return jsonify({"error": str(e)}), 500
 
  
 

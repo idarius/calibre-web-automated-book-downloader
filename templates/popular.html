@@ -1,0 +1,71 @@
+<!-- Popular Books Header -->
+<section class="mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h1 class="text-2xl font-bold mb-2">Livres Populaires</h1>
+            <p class="opacity-70">Découvrez les livres les plus populaires ce mois-ci</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="flex items-center border rounded" style="border-color: var(--border-muted);" id="popular-view-toggle-container">
+                <button id="popular-view-grid" class="px-2 py-1 text-sm view-toggle active" title="Vue grille" data-view="grid">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                </button>
+                <button id="popular-view-list" class="px-2 py-1 text-sm view-toggle" title="Vue liste" data-view="list">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
+            <button id="refresh-popular" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- Popular Books Content -->
+<section class="mb-8">
+    <div id="popular-books-loading" class="text-sm opacity-80">Loading…</div>
+    <div id="popular-books-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <!-- Popular book cards will be injected here -->
+    </div>
+    <div id="no-popular-books" class="text-sm opacity-80 hidden">No popular books available.</div>
+</section>
+
+<!-- Info Section -->
+<section class="mb-8">
+    <div class="rounded-lg p-6" style="background: var(--bg-soft); border: 1px solid var(--border-muted);">
+        <h2 class="text-lg font-semibold mb-3">À propos des livres populaires</h2>
+        <p class="opacity-80 mb-4">
+            Cette section présente les livres les plus tendances du moment, basés sur les classements des meilleures ventes et les recommandations populaires. Les livres sont mis à jour régulièrement pour refléter les dernières tendances.
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto mb-2 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <h3 class="font-medium mb-1">Tendances Actuelles</h3>
+                <p class="text-sm opacity-70">Les livres les plus populaires du moment</p>
+            </div>
+            <div class="text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto mb-2 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 class="font-medium mb-1">Mises à jour régulières</h3>
+                <p class="text-sm opacity-70">Nouveaux livres ajoutés chaque semaine</p>
+            </div>
+            <div class="text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto mb-2 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+                <h3 class="font-medium mb-1">Sélection variée</h3>
+                <p class="text-sm opacity-70">Différents genres et catégories</p>
+            </div>
+        </div>
+    </div>
+</section>

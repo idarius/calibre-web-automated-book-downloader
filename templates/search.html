@@ -1,0 +1,154 @@
+<!-- Hero / Search -->
+<section class="mb-6">
+    <div class="flex flex-col gap-3">
+        <div class="flex gap-2">
+            <input id="search-input" type="search" placeholder="Search by ISBN, title, author..." aria-label="Search books"
+                   class="flex-1 px-4 py-3 rounded-md border outline-none"
+                   style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+            <button id="search-button" class="px-4 py-3 rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                Search
+            </button>
+        </div>
+        <div>
+            <button id="toggle-advanced" class="text-sm underline opacity-80 hover:opacity-100">Advanced Search</button>
+        </div>
+        <!-- Advanced Filters -->
+        <form id="search-filters" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 hidden">
+            <div>
+                <label for="isbn-input" class="block text-sm mb-1 opacity-80">ISBN</label>
+                <input id="isbn-input" type="search" placeholder="ISBN"
+                       class="w-full px-3 py-2 rounded-md border"
+                       style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+            </div>
+            <div>
+                <label for="author-input" class="block text-sm mb-1 opacity-80">Author</label>
+                <input id="author-input" type="search" placeholder="Author"
+                       class="w-full px-3 py-2 rounded-md border"
+                       style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+            </div>
+            <div>
+                <label for="title-input" class="block text-sm mb-1 opacity-80">Title</label>
+                <input id="title-input" type="search" placeholder="Title"
+                       class="w-full px-3 py-2 rounded-md border"
+                       style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+            </div>
+            <div>
+                <label for="lang-input" class="block text-sm mb-1 opacity-80">Language</label>
+                <select id="lang-input" class="w-full px-3 py-2 rounded-md border"
+                        style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                    <option value="all">All</option>
+                    {% for lang in book_languages %}
+                        <option value="{{ lang.code }}" {% if lang.code == default_language[0] %}selected{% endif %}>
+                            {{ lang.language }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="sort-input" class="block text-sm mb-1 opacity-80">Sort</label>
+                <select id="sort-input" class="w-full px-3 py-2 rounded-md border"
+                        style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                    <option value="">Most relevant</option>
+                    <option value="newest">Newest (publication year)</option>
+                    <option value="oldest">Oldest (publication year)</option>
+                    <option value="largest">Largest (filesize)</option>
+                    <option value="smallest">Smallest (filesize)</option>
+                    <option value="newest_added">Newest (open sourced)</option>
+                    <option value="oldest_added">Oldest (open sourced)</option>
+                </select>
+            </div>
+            <div>
+                <label for="content-input" class="block text sm mb-1 opacity-80">Content</label>
+                <select id="content-input" class="w-full px-3 py-2 rounded-md border"
+                        style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                    <option value="">All</option>
+                    <option value="book_nonfiction">Book (non-fiction)</option>
+                    <option value="book_fiction">Book (fiction)</option>
+                    <option value="book_unknown">Book (unknown)</option>
+                    <option value="magazine">Magazine</option>
+                    <option value="book_comic">Comic Book</option>
+                    <option value="standards_document">Standards document</option>
+                    <option value="other">Other</option>
+                    <option value="musical_score">Musical score</option>
+                    <option value="audiobook">Audiobook</option>
+                </select>
+            </div>
+            <div class="md:col-span-2 lg:col-span-3">
+                <label class="block text-sm mb-1 opacity-80">Formats</label>
+                <div class="flex flex-wrap gap-3 text-sm">
+                    <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'pdf' not in supported_formats else '' }}">
+                        <input type="checkbox" id="format-pdf" value="pdf" {% if 'pdf' not in supported_formats %}disabled{% endif %}>
+                        PDF
+                    </label>
+                    <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'epub' not in supported_formats else '' }}">
+                        <input type="checkbox" id="format-epub" value="epub" {% if 'epub' in supported_formats %}checked{% endif %} {% if 'epub' not in supported_formats %}disabled{% endif %}>
+                        EPUB
+                    </label>
+                    <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'mobi' not in supported_formats else '' }}">
+                        <input type="checkbox" id="format-mobi" value="mobi" {% if 'mobi' in supported_formats %}checked{% endif %} {% if 'mobi' not in supported_formats %}disabled{% endif %}>
+                        MOBI
+                    </label>
+                    <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'azw3' not in supported_formats else '' }}">
+                        <input type="checkbox" id="format-azw3" value="azw3" {% if 'azw3' in supported_formats %}checked{% endif %} {% if 'azw3' not in supported_formats %}disabled{% endif %}>
+                        AZW3
+                    </label>
+                    <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'fb2' not in supported_formats else '' }}">
+                        <input type="checkbox" id="format-fb2" value="fb2" {% if 'fb2' in supported_formats %}checked{% endif %} {% if 'fb2' not in supported_formats %}disabled{% endif %}>
+                        FB2
+                    </label>
+                    <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'djvu' not in supported_formats else '' }}">
+                        <input type="checkbox" id="format-djvu" value="djvu" {% if 'djvu' in supported_formats %}checked{% endif %} {% if 'djvu' not in supported_formats %}disabled{% endif %}>
+                        DJVU
+                    </label>
+                    <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'cbz' not in supported_formats else '' }}">
+                        <input type="checkbox" id="format-cbz" value="cbz" {% if 'cbz' in supported_formats %}checked{% endif %} {% if 'cbz' not in supported_formats %}disabled{% endif %}>
+                        CBZ
+                    </label>
+                    <label class="inline-flex items-center gap-2 {{ 'opacity-50 cursor-not-allowed' if 'cbr' not in supported_formats else '' }}">
+                        <input type="checkbox" id="format-cbr" value="cbr" {% if 'cbr' in supported_formats %}checked{% endif %} {% if 'cbr' not in supported_formats %}disabled{% endif %}>
+                        CBR
+                    </label>
+                </div>
+            </div>
+            <div class="md:col-span-2 lg:col-span-3 flex justify-end">
+                <button id="adv-search-button" type="button" class="px-4 py-2 rounded-md border"
+                        style="border-color: var(--border-muted);">Search</button>
+            </div>
+        </form>
+    </div>
+</section>
+
+<!-- Active Downloads (Top) -->
+<section id="active-downloads-top" class="mb-6 hidden">
+    <div class="flex items-center justify-between mb-2">
+        <h2 class="text-lg font-semibold">Active Downloads</h2>
+        <button id="active-refresh-button" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">Refresh</button>
+    </div>
+    <div id="active-downloads-list" class="space-y-2"></div>
+</section>
+
+<!-- Results -->
+<section class="mb-8" id="search-section">
+    <div class="flex items-center justify-between mb-3">
+        <h2 class="text-xl font-semibold">Search Results</h2>
+        <div class="flex items-center gap-3">
+            <div id="search-loading" class="text-sm opacity-80 hidden">Loading…</div>
+            <div class="flex items-center border rounded" style="border-color: var(--border-muted);" id="view-toggle-container">
+                <button id="view-grid" class="px-2 py-1 text-sm view-toggle active" title="Vue grille" data-view="grid">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                </button>
+                <button id="view-list" class="px-2 py-1 text-sm view-toggle" title="Vue liste" data-view="list">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div id="results-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <!-- Cards/List items will be injected here -->
+    </div>
+    <div id="no-results" class="mt-4 text-sm opacity-80 hidden">No results found.</div>
+</section>
