@@ -887,85 +887,92 @@
     },
     
     initializePopularPage() {
-      // Re-initialize popular books functionality if it exists
-      if (typeof homeSections !== 'undefined') {
-        console.log('=== INITIALIZING POPULAR PAGE ===');
-        
-        // Make sure DOM elements exist before trying to use them
-        const initWithRetry = (retryCount = 0) => {
-          setTimeout(() => {
-            try {
-              // Check if required elements exist
-              const container = document.getElementById('popular-books-container');
-              const loading = document.getElementById('popular-books-loading');
-              const noBooks = document.getElementById('no-popular-books');
-              const viewGridBtn = document.getElementById('popular-view-grid');
-              const viewListBtn = document.getElementById('popular-view-list');
-              const viewToggleContainer = document.getElementById('popular-view-toggle-container');
-              
-              console.log('=== POPULAR PAGE ELEMENTS CHECK ===');
-              console.log('container:', !!container, 'id:', container?.id);
-              console.log('loading:', !!loading, 'id:', loading?.id);
-              console.log('noBooks:', !!noBooks, 'id:', noBooks?.id);
-              console.log('viewGridBtn:', !!viewGridBtn, 'id:', viewGridBtn?.id);
-              console.log('viewListBtn:', !!viewListBtn, 'id:', viewListBtn?.id);
-              console.log('viewToggleContainer:', !!viewToggleContainer, 'id:', viewToggleContainer?.id);
-              console.log('retryCount:', retryCount);
-              
-              if (!container || !loading) {
-                console.warn('Popular page elements not found, retrying...');
-                if (retryCount < 3) {
-                  initWithRetry(retryCount + 1);
-                } else {
-                  console.error('Failed to initialize popular page after 3 retries');
-                  this.showPopularPageError();
-                }
-                return;
-              }
-              
-              // Initialize view toggle buttons first
-              console.log('Calling reinitPopularViewButtons...');
-              homeSections.reinitPopularViewButtons();
-              
-              // Fetch popular books immediately
-              console.log('Initializing popular page, fetching books...');
-              homeSections.fetchPopularBooks();
-              
-              // Re-bind refresh button
-              const refreshBtn = document.getElementById('refresh-popular');
-              if (refreshBtn) {
-                // Remove existing listeners to avoid duplicates
-                refreshBtn.replaceWith(refreshBtn.cloneNode(true));
-                const newRefreshBtn = document.getElementById('refresh-popular');
-                newRefreshBtn.addEventListener('click', () => {
-                  console.log('Refresh button clicked, fetching popular books...');
-                  homeSections.fetchPopularBooks(true);
-                });
-              }
-              
-              // Set up a timeout to check if loading is stuck
-              setTimeout(() => {
-                if (loading && !loading.classList.contains('hidden')) {
-                  console.warn('Popular books loading seems stuck, retrying...');
-                  homeSections.fetchPopularBooks();
-                }
-              }, 5000);
-              
-            } catch (error) {
-              console.error('Error initializing popular page:', error);
+      console.log('=== INITIALIZING POPULAR PAGE ===');
+      
+      // Make sure DOM elements exist before trying to use them
+      const initWithRetry = (retryCount = 0) => {
+        setTimeout(() => {
+          try {
+            // Check if required elements exist
+            const container = document.getElementById('popular-books-container');
+            const loading = document.getElementById('popular-books-loading');
+            const noBooks = document.getElementById('no-popular-books');
+            const viewGridBtn = document.getElementById('popular-view-grid');
+            const viewListBtn = document.getElementById('popular-view-list');
+            const viewToggleContainer = document.getElementById('popular-view-toggle-container');
+            
+            console.log('=== POPULAR PAGE ELEMENTS CHECK ===');
+            console.log('container:', !!container, 'id:', container?.id);
+            console.log('loading:', !!loading, 'id:', loading?.id);
+            console.log('noBooks:', !!noBooks, 'id:', noBooks?.id);
+            console.log('viewGridBtn:', !!viewGridBtn, 'id:', viewGridBtn?.id);
+            console.log('viewListBtn:', !!viewListBtn, 'id:', viewListBtn?.id);
+            console.log('viewToggleContainer:', !!viewToggleContainer, 'id:', viewToggleContainer?.id);
+            console.log('retryCount:', retryCount);
+            
+            if (!container || !loading) {
+              console.warn('Popular page elements not found, retrying...');
               if (retryCount < 3) {
                 initWithRetry(retryCount + 1);
               } else {
+                console.error('Failed to initialize popular page after 3 retries');
                 this.showPopularPageError();
               }
+              return;
             }
-          }, 100 + (retryCount * 200)); // Increasing delay with each retry
-        };
-        
-        initWithRetry();
-      } else {
-        console.error('homeSections object not available for popular page initialization');
-      }
+            
+            // Utiliser le viewManager pour initialiser les boutons de vue
+            if (typeof viewManager !== 'undefined') {
+              console.log('Using viewManager to initialize popular view toggle');
+              viewManager.reinitPopularViewButtons();
+            } else {
+              console.error('viewManager not available for popular view initialization');
+            }
+            
+            // Fetch popular books immediately
+            console.log('Initializing popular page, fetching books...');
+            if (typeof homeSections !== 'undefined') {
+              homeSections.fetchPopularBooks();
+            } else {
+              console.error('homeSections object not available for fetching popular books');
+            }
+            
+            // Re-bind refresh button
+            const refreshBtn = document.getElementById('refresh-popular');
+            if (refreshBtn) {
+              // Remove existing listeners to avoid duplicates
+              refreshBtn.replaceWith(refreshBtn.cloneNode(true));
+              const newRefreshBtn = document.getElementById('refresh-popular');
+              newRefreshBtn.addEventListener('click', () => {
+                console.log('Refresh button clicked, fetching popular books...');
+                if (typeof homeSections !== 'undefined') {
+                  homeSections.fetchPopularBooks(true);
+                }
+              });
+            }
+            
+            // Set up a timeout to check if loading is stuck
+            setTimeout(() => {
+              if (loading && !loading.classList.contains('hidden')) {
+                console.warn('Popular books loading seems stuck, retrying...');
+                if (typeof homeSections !== 'undefined') {
+                  homeSections.fetchPopularBooks();
+                }
+              }
+            }, 5000);
+            
+          } catch (error) {
+            console.error('Error initializing popular page:', error);
+            if (retryCount < 3) {
+              initWithRetry(retryCount + 1);
+            } else {
+              this.showPopularPageError();
+            }
+          }
+        }, 100 + (retryCount * 200)); // Increasing delay with each retry
+      };
+      
+      initWithRetry();
     },
     
     showPopularPageError() {
@@ -1906,6 +1913,7 @@
   // ---- View Management ----
   const viewManager = {
     currentView: VIEW_MODES.GRID,
+    popularCurrentView: VIEW_MODES.GRID,
     
     init() {
       // Récupérer la préférence sauvegardée
@@ -1924,6 +1932,9 @@
       if (viewListBtn) {
         viewListBtn.addEventListener('click', () => this.setView(VIEW_MODES.LIST));
       }
+      
+      // Initialiser les boutons de vue pour les livres populaires
+      this.initPopularViewToggle();
     },
     
     reinitViewButtons() {
@@ -2374,6 +2385,589 @@
           console.error('Error in emergency cleanup:', cleanupError);
         }
       }
+    },
+    
+    // Méthodes pour gérer les vues des livres populaires
+    initPopularViewToggle() {
+      console.log('=== INIT POPULAR VIEW TOGGLE IN VIEWMANAGER ===');
+      
+      // Récupérer les boutons de vue pour les livres populaires
+      const viewGridBtn = document.getElementById('popular-view-grid');
+      const viewListBtn = document.getElementById('popular-view-list');
+      
+      console.log('Popular view buttons found:', {
+        grid: !!viewGridBtn,
+        list: !!viewListBtn
+      });
+      
+      if (viewGridBtn) {
+        viewGridBtn.addEventListener('click', () => this.setPopularView(VIEW_MODES.GRID));
+      }
+      
+      if (viewListBtn) {
+        viewListBtn.addEventListener('click', () => this.setPopularView(VIEW_MODES.LIST));
+      }
+      
+      // Initialiser l'état des boutons
+      this.updatePopularViewButtons();
+    },
+    
+    reinitPopularViewButtons() {
+      console.log('=== REINITIALIZING POPULAR VIEW BUTTONS IN VIEWMANAGER ===');
+      
+      // Récupérer les boutons de vue populaires
+      const viewGridBtn = document.getElementById('popular-view-grid');
+      const viewListBtn = document.getElementById('popular-view-list');
+      
+      if (!viewGridBtn || !viewListBtn) {
+        console.warn('Popular view buttons not found for reinitialization');
+        return;
+      }
+      
+      // Cloner les boutons pour supprimer les anciens gestionnaires d'événements
+      const newGridBtn = viewGridBtn.cloneNode(true);
+      const newListBtn = viewListBtn.cloneNode(true);
+      
+      // Remplacer les anciens boutons par les nouveaux
+      viewGridBtn.parentNode.replaceChild(newGridBtn, viewGridBtn);
+      viewListBtn.parentNode.replaceChild(newListBtn, viewListBtn);
+      
+      // Ajouter les nouveaux gestionnaires d'événements
+      newGridBtn.addEventListener('click', () => this.setPopularView(VIEW_MODES.GRID));
+      newListBtn.addEventListener('click', () => this.setPopularView(VIEW_MODES.LIST));
+      
+      // Mettre à jour l'état visuel des boutons
+      this.updatePopularViewButtons();
+      
+      console.log('Popular view buttons reinitialized successfully');
+    },
+    
+    setPopularView(viewMode) {
+      console.log('=== SET POPULAR VIEW CALLED IN VIEWMANAGER ===');
+      console.log('viewMode:', viewMode);
+      
+      if (this.popularCurrentView === viewMode) return;
+      
+      this.popularCurrentView = viewMode;
+      this.updatePopularViewButtons();
+      
+      // Re-render les résultats avec la nouvelle vue
+      const currentData = window.lastPopularResults || [];
+      this.renderPopularResults(currentData);
+    },
+    
+    updatePopularViewButtons() {
+      console.log('=== UPDATE POPULAR VIEW BUTTONS CALLED IN VIEWMANAGER ===');
+      
+      // Mettre à jour l'état actif des boutons - utiliser le bon sélecteur CSS
+      document.querySelectorAll('#popular-view-toggle-container .view-toggle').forEach(btn => {
+        if (btn.getAttribute('data-view') === this.popularCurrentView) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+      
+      // Mettre à jour les classes du conteneur
+      let popularContainer = document.getElementById('popular-books-container');
+      if (popularContainer) {
+        popularContainer.classList.remove('grid-view', 'list-view');
+        popularContainer.classList.add(`${this.popularCurrentView}-view`);
+      } else {
+        console.error('Popular books container not found in updatePopularViewButtons');
+      }
+    },
+    
+    renderPopularResults(books) {
+      console.log('=== RENDER POPULAR RESULTS CALLED IN VIEWMANAGER ===');
+      console.log('Books count:', books ? books.length : 0);
+      console.log('Current view:', this.popularCurrentView);
+      
+      if (this.popularCurrentView === VIEW_MODES.GRID) {
+        this.renderPopularGrid(books);
+      } else {
+        this.renderPopularList(books);
+      }
+    },
+    
+    renderPopularGrid(books) {
+      try {
+        const container = document.getElementById('popular-books-container');
+        const noBooks = document.getElementById('no-popular-books');
+        
+        if (!container) {
+          console.error('Popular books container not found in viewManager.renderPopularGrid');
+          return;
+        }
+        
+        // Masquer les états de chargement
+        const loading = document.getElementById('popular-books-loading');
+        if (loading) {
+          loading.classList.add('hidden');
+          loading.style.display = 'none';
+        }
+        
+        // S'assurer que le conteneur est vide
+        container.innerHTML = '';
+        
+        // Nettoyer les éléments optimistes
+        this.cleanupOptimisticElements(container);
+        
+        if (!books || books.length === 0) {
+          // Masquer le conteneur s'il n'y a pas de livres
+          container.style.display = 'none';
+          container.classList.add('empty-container');
+          if (noBooks) {
+            noBooks.classList.remove('hidden');
+            noBooks.style.display = '';
+          }
+          return;
+        }
+        
+        // Afficher le conteneur et masquer le message "no books"
+        container.style.display = '';
+        container.classList.remove('empty-container');
+        if (noBooks) {
+          noBooks.classList.add('hidden');
+          noBooks.style.display = 'none';
+        }
+        
+        // Configurer le conteneur pour la vue grille
+        container.classList.remove('list-view');
+        container.classList.add('grid-view');
+        
+        const frag = document.createDocumentFragment();
+        let validCards = 0;
+        
+        books.forEach((book) => {
+          try {
+            const card = renderCard(book);
+            if (card) {
+              frag.appendChild(card);
+              validCards++;
+            }
+          } catch (error) {
+            console.error('Error rendering popular card for book:', book, error);
+          }
+        });
+        
+        // N'ajouter le contenu que s'il y a des éléments valides
+        if (validCards > 0) {
+          container.appendChild(frag);
+          container.classList.remove('empty-container');
+        } else {
+          // Si aucun élément valide n'a été créé, masquer le conteneur
+          container.style.display = 'none';
+          container.classList.add('empty-container');
+          if (noBooks) {
+            noBooks.classList.remove('hidden');
+            noBooks.style.display = '';
+          }
+        }
+      } catch (error) {
+        console.error('Error in viewManager.renderPopularGrid:', error);
+        // En cas d'erreur, masquer le conteneur et afficher le message d'erreur
+        const container = document.getElementById('popular-books-container');
+        const noBooks = document.getElementById('no-popular-books');
+        
+        if (container) {
+          container.style.display = 'none';
+          container.classList.add('empty-container');
+        }
+        if (noBooks) {
+          noBooks.classList.remove('hidden');
+          noBooks.style.display = '';
+        }
+      }
+    },
+    
+    renderPopularList(books) {
+      console.log('=== RENDER POPULAR LIST CALLED IN VIEWMANAGER ===');
+      console.log('Books data:', books ? `${books.length} items` : 'null/undefined');
+      
+      let criticalError = false;
+      let errorMessage = '';
+      
+      try {
+        const container = document.getElementById('popular-books-container');
+        const noBooks = document.getElementById('no-popular-books');
+        
+        if (!container) {
+          criticalError = true;
+          errorMessage = 'Popular books container not found in viewManager.renderPopularList';
+          console.error(errorMessage);
+          return;
+        }
+        
+        // Masquer les états de chargement
+        const loading = document.getElementById('popular-books-loading');
+        if (loading) {
+          loading.classList.add('hidden');
+          loading.style.display = 'none';
+        }
+        
+        // S'assurer que le conteneur est vide
+        container.innerHTML = '';
+        
+        // Nettoyer les éléments optimistes avec gestion d'erreur
+        try {
+          this.cleanupOptimisticElements(container);
+        } catch (cleanupError) {
+          console.warn('Error during cleanup in viewManager.renderPopularList:', cleanupError);
+          // Continuer malgré l'erreur de nettoyage
+        }
+        
+        if (!books || books.length === 0) {
+          console.log('No popular books to display, showing empty state');
+          // Masquer le conteneur s'il n'y a pas de livres
+          container.style.display = 'none';
+          container.classList.add('empty-container');
+          if (noBooks) {
+            noBooks.classList.remove('hidden');
+            noBooks.style.display = '';
+          }
+          return;
+        }
+        
+        // Afficher le conteneur et masquer le message "no books"
+        container.style.display = '';
+        container.classList.remove('empty-container');
+        if (noBooks) {
+          noBooks.classList.add('hidden');
+          noBooks.style.display = 'none';
+        }
+        
+        // Configurer le conteneur pour la vue liste
+        container.classList.remove('grid-view');
+        container.classList.add('list-view');
+        
+        // Créer la structure du tableau avec gestion d'erreur
+        let table, tbody;
+        try {
+          table = document.createElement('div');
+          table.className = 'overflow-x-auto';
+          table.innerHTML = `
+            <table class="w-full border-collapse" style="border-color: var(--border-muted);">
+              <thead>
+                <tr style="background: var(--bg-soft);">
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Classement</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Preview</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Title</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Author</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Year</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="popular-results-tbody">
+                <!-- Les lignes seront injectées ici -->
+              </tbody>
+            </table>
+          `;
+          
+          container.appendChild(table);
+          tbody = document.getElementById('popular-results-tbody');
+          
+          if (!tbody) {
+            throw new Error('Failed to create or find popular results tbody element');
+          }
+        } catch (tableError) {
+          console.error('Error creating popular table structure in viewManager:', tableError);
+          // Afficher un message d'erreur dans le conteneur mais ne pas le masquer complètement
+          container.innerHTML = `
+            <div class="text-center p-4">
+              <p class="text-red-500 mb-2">Erreur lors de la création du tableau des livres populaires</p>
+              <p class="text-sm opacity-70">${tableError.message}</p>
+              <button onclick="viewManager.renderPopularResults(window.lastPopularResults)" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
+                Réessayer
+              </button>
+            </div>
+          `;
+          return;
+        }
+        
+        // Ajouter chaque livre comme une ligne séparée avec gestion d'erreur individuelle
+        let validRows = 0;
+        let errorCount = 0;
+        
+        books.forEach((book, index) => {
+          try {
+            // Vérification de base des données du livre
+            if (!book || typeof book !== 'object') {
+              console.warn(`Invalid popular book object at index ${index}:`, book);
+              errorCount++;
+              return;
+            }
+            
+            const row = this.createPopularListItem(book, index + 1); // Ajouter 1 pour commencer à 1
+            if (row) {
+              tbody.appendChild(row);
+              validRows++;
+            } else {
+              console.warn(`Failed to render popular row for book at index ${index}:`, book);
+              errorCount++;
+            }
+          } catch (itemError) {
+            console.error(`Error rendering popular list item for book at index ${index}:`, book, itemError);
+            errorCount++;
+            
+            // Ajouter une ligne d'erreur pour ce livre spécifique
+           try {
+             const errorRow = document.createElement('tr');
+             errorRow.className = 'border-b';
+             errorRow.style.borderColor = 'var(--border-muted)';
+             errorRow.innerHTML = `
+               <td colspan="6" class="p-3 text-center text-sm opacity-70">
+                 Erreur d'affichage: ${itemError.message}
+               </td>
+             `;
+             tbody.appendChild(errorRow);
+           } catch (errorRowError) {
+             console.error('Failed to create popular error row:', errorRowError);
+           }
+          }
+        });
+        
+        console.log(`viewManager.renderPopularList completed: ${validRows} valid rows, ${errorCount} errors`);
+        
+        // Si aucune ligne valide n'a été créée, afficher un message approprié
+        if (validRows === 0) {
+          console.warn('No valid popular rows were created');
+          container.innerHTML = `
+            <div class="text-center p-4">
+              <p class="text-red-500 mb-2">Aucun livre populaire ne peut être affiché</p>
+              <p class="text-sm opacity-70">Vérifiez les données et réessayez</p>
+              <button onclick="viewManager.renderPopularResults(window.lastPopularResults)" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
+                Réessayer
+              </button>
+            </div>
+          `;
+        } else {
+          container.classList.remove('empty-container');
+          
+          // S'il y a eu des erreurs mais que des lignes valides existent, afficher un avertissement
+          if (errorCount > 0) {
+            const warningRow = document.createElement('tr');
+            warningRow.innerHTML = `
+              <td colspan="5" class="p-2 text-center text-xs opacity-70" style="background: var(--bg-soft);">
+                ⚠️ ${errorCount} livre(s) populaire(s) n'ont pas pu être affichés correctement
+              </td>
+            `;
+            tbody.insertBefore(warningRow, tbody.firstChild);
+          }
+        }
+      } catch (error) {
+        criticalError = true;
+        errorMessage = error.message;
+        console.error('Critical error in viewManager.renderPopularList:', error);
+        console.error('Error stack:', error.stack);
+        
+        // En cas d'erreur critique, afficher un message détaillé mais ne masquer le conteneur qu'en dernier recours
+        const container = document.getElementById('popular-books-container');
+        if (container) {
+          container.innerHTML = `
+            <div class="text-center p-4">
+              <p class="text-red-500 mb-2">Erreur critique lors de l'affichage des livres populaires en liste</p>
+              <p class="text-sm opacity-70">${errorMessage}</p>
+              <button onclick="viewManager.renderPopularResults(window.lastPopularResults)" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
+                Réessayer
+              </button>
+            </div>
+          `;
+        }
+      }
+      
+      // Journalisation pour le débogage
+      if (criticalError) {
+        console.error('viewManager.renderPopularList failed with critical error:', errorMessage);
+      } else {
+        console.log('viewManager.renderPopularList completed successfully');
+      }
+    },
+    
+    createPopularListItem(book, rank) {
+      const isAppleBook = book.isAppleBook || false;
+      
+      // Fonction pour nettoyer les données de l'auteur (identique à renderListItem)
+      const cleanAuthor = (author) => {
+        if (!author) return 'Unknown author';
+        
+        // Essayer d'extraire le nom complet (nom + prénom) avant les séparateurs
+        const patterns = [
+          /^(.+?)\s*\[/,  // Avant le premier crochet
+          /^(.+?)\s*;/,   // Avant le premier point-virgule
+          /^(.+?)\s*-\s/, // Avant le premier tiret avec espaces
+          /^(.+?)\s*\(/,  // Avant la première parenthèse
+        ];
+        
+        for (const pattern of patterns) {
+          const match = author.match(pattern);
+          if (match && match[1]) {
+            let cleaned = match[1].trim();
+            
+            // Si le nom contient des virgules, essayer de prendre les deux premières parties (nom, prénom)
+            if (cleaned.includes(',')) {
+              const parts = cleaned.split(',').map(p => p.trim());
+              if (parts.length >= 2) {
+                // Inverser pour avoir "Prénom Nom" au lieu de "Nom, Prénom"
+                cleaned = parts[1] + ' ' + parts[0];
+              } else {
+                cleaned = parts[0];
+              }
+            }
+            
+            // Limiter à un nom raisonnable (max 30 caractères)
+            if (cleaned.length > 30) {
+              const words = cleaned.split(/\s+/);
+              if (words.length >= 2) {
+                // Prendre les deux premiers mots (généralement prénom + nom)
+                cleaned = words.slice(0, 2).join(' ');
+              } else {
+                cleaned = cleaned.substring(0, 30);
+              }
+            }
+            
+            // Vérifier si c'est un nom propre (contient au moins une majuscule)
+            if (/[A-Z]/.test(cleaned) && cleaned.length > 1) {
+              return cleaned;
+            }
+          }
+        }
+        
+        // Si aucun pattern ne correspond, essayer de trouver les deux premiers mots avec majuscules
+        const words = author.split(/\s+/);
+        const capitalizedWords = words.filter(word => /[A-Z]/.test(word) && word.length > 1);
+        
+        if (capitalizedWords.length >= 2) {
+          return capitalizedWords.slice(0, 2).join(' ');
+        } else if (capitalizedWords.length === 1) {
+          return capitalizedWords[0];
+        }
+        
+        // En dernier recours, retourner les deux premiers mots
+        if (words.length >= 2) {
+          return words.slice(0, 2).join(' ');
+        } else {
+          return words[0] || 'Unknown author';
+        }
+      };
+      
+      // Fonction pour nettoyer les dates (prendre seulement la première année)
+      const cleanYear = (year) => {
+        if (!year) return '';
+        
+        // Si l'année contient plusieurs années concaténées, prendre la première
+        const yearMatch = year.match(/(\d{4})/);
+        if (yearMatch) {
+          return yearMatch[1];
+        }
+        
+        return '';
+      };
+      
+      // Cellule Classement
+      const rankCell = document.createElement('td');
+      rankCell.className = 'p-3 font-medium text-center';
+      rankCell.textContent = rank || '-';
+      
+      // Cellule Preview
+      const previewCell = document.createElement('td');
+      previewCell.className = 'p-3';
+      
+      // Vérifier si on est sur mobile (désactiver le zoom sur mobile)
+      const isMobile = window.innerWidth <= 768;
+      
+      if (book.preview && !isMobile) {
+        const coverContainer = document.createElement('div');
+        coverContainer.className = 'cover-zoom-container';
+        
+        const coverImg = document.createElement('img');
+        coverImg.src = utils.e(book.preview);
+        coverImg.alt = 'Cover';
+        coverImg.className = 'book-cover w-12 h-16 object-cover rounded cursor-pointer';
+        coverImg.setAttribute('data-book-id', utils.e(book.id));
+        coverImg.setAttribute('data-src', utils.e(book.preview));
+        
+        // Ajouter le gestionnaire d'événements pour le zoom animé
+        coverImg.addEventListener('click', (e) => {
+          e.stopPropagation();
+          coverZoomManager.showZoomedImage(coverImg);
+        });
+        
+        coverContainer.appendChild(coverImg);
+        previewCell.appendChild(coverContainer);
+      } else if (book.preview && isMobile) {
+        // Sur mobile, juste l'image sans zoom
+        const coverImg = document.createElement('img');
+        coverImg.src = utils.e(book.preview);
+        coverImg.alt = 'Cover';
+        coverImg.className = 'w-12 h-16 object-cover rounded';
+        previewCell.appendChild(coverImg);
+      } else {
+        // Pas d'image disponible
+        const noCover = document.createElement('div');
+        noCover.className = 'w-12 h-16 rounded flex items-center justify-center opacity-70 text-xs';
+        noCover.style.background = 'var(--bg-soft)';
+        noCover.textContent = 'No Cover';
+        previewCell.appendChild(noCover);
+      }
+      
+      // Cellule Title
+      const titleCell = document.createElement('td');
+      titleCell.className = 'p-3 font-medium';
+      titleCell.textContent = utils.e(book.title) || 'Untitled';
+      
+      // Cellule Author (nettoyée)
+      const authorCell = document.createElement('td');
+      authorCell.className = 'p-3';
+      authorCell.textContent = cleanAuthor(book.author);
+      
+      // Cellule Year
+      const yearCell = document.createElement('td');
+      yearCell.className = 'p-3';
+      yearCell.textContent = cleanYear(book.year || book.releaseDate) || '-';
+      
+      // Cellule Actions (verticale)
+      const actionsCell = document.createElement('td');
+      actionsCell.className = 'p-3';
+      const actionsContainer = document.createElement('div');
+      actionsContainer.className = 'flex flex-col gap-1 items-center';
+      
+      const actionBtn = document.createElement('button');
+      actionBtn.className = 'px-2 py-1 rounded border text-xs w-full';
+      actionBtn.style.borderColor = 'var(--border-muted)';
+      actionBtn.textContent = isAppleBook ? 'Search' : 'Details';
+      actionBtn.setAttribute('data-action', isAppleBook ? 'search' : 'details');
+      actionBtn.setAttribute('data-title', utils.e(book.title));
+      
+      if (isAppleBook) {
+        actionBtn.addEventListener('click', () => {
+          homeSections.searchForAppleBook(book.title, book.author);
+        });
+      } else {
+        actionBtn.addEventListener('click', () => {
+          bookDetails.show(book.id);
+        });
+      }
+      
+      actionsContainer.appendChild(actionBtn);
+      actionsCell.appendChild(actionsContainer);
+      
+      // Assembler la ligne
+      const row = document.createElement('tr');
+      row.className = 'border-b';
+      row.style.borderColor = 'var(--border-muted)';
+      if (isAppleBook) {
+        row.classList.add('apple-book-card');
+      }
+      
+      row.appendChild(rankCell);
+      row.appendChild(previewCell);
+      row.appendChild(titleCell);
+      row.appendChild(authorCell);
+      row.appendChild(yearCell);
+      row.appendChild(actionsCell);
+      
+      return row;
     }
   };
 
@@ -4130,515 +4724,12 @@
         container.appendChild(cacheInfoDiv);
       }
       
-      // Utiliser les mêmes fonctions de rendu que la recherche
-      this.renderPopularResults(books);
-    },
-    
-    renderPopularResults(books) {
-      // Utiliser la vue actuelle (grille par défaut)
-      const currentView = this.getPopularViewMode();
-      
-      if (currentView === VIEW_MODES.GRID) {
-        this.renderPopularGrid(books);
+      // Utiliser le viewManager unifié pour le rendu
+      if (typeof viewManager !== 'undefined') {
+        viewManager.renderPopularResults(books);
       } else {
-        this.renderPopularList(books);
+        console.error('viewManager not available for rendering popular books');
       }
-    },
-    
-    getPopularViewMode() {
-      console.log('=== GET POPULAR VIEW MODE ===');
-      
-      // Récupérer la vue actuelle depuis les boutons avec une référence dynamique
-      const container = el.popularViewToggleContainer || document.getElementById('popular-view-toggle-container');
-      console.log('container found:', !!container, 'id:', container?.id);
-      
-      const activeBtn = container?.querySelector('.view-toggle.active');
-      console.log('activeBtn found:', !!activeBtn, 'id:', activeBtn?.id, 'data-view:', activeBtn?.getAttribute('data-view'));
-      
-      const viewMode = activeBtn?.getAttribute('data-view') || VIEW_MODES.GRID;
-      console.log('Returning viewMode:', viewMode);
-      
-      return viewMode;
-    },
-    
-    renderPopularGrid(books) {
-      try {
-        const container = document.getElementById('popular-books-container');
-        const noBooks = document.getElementById('no-popular-books');
-        
-        if (!container) {
-          console.error('Popular books container not found');
-          return;
-        }
-        
-        // Masquer les états de chargement
-        const loading = document.getElementById('popular-books-loading');
-        if (loading) {
-          loading.classList.add('hidden');
-          loading.style.display = 'none';
-        }
-        
-        // S'assurer que le conteneur est vide
-        container.innerHTML = '';
-        
-        // Nettoyer les éléments optimistes
-        viewManager.cleanupOptimisticElements(container);
-        
-        if (!books || books.length === 0) {
-          // Masquer le conteneur s'il n'y a pas de livres
-          container.style.display = 'none';
-          container.classList.add('empty-container');
-          if (noBooks) {
-            noBooks.classList.remove('hidden');
-            noBooks.style.display = '';
-          }
-          return;
-        }
-        
-        // Afficher le conteneur et masquer le message "no books"
-        container.style.display = '';
-        container.classList.remove('empty-container');
-        if (noBooks) {
-          noBooks.classList.add('hidden');
-          noBooks.style.display = 'none';
-        }
-        
-        // Configurer le conteneur pour la vue grille
-        container.classList.remove('list-view');
-        container.classList.add('grid-view');
-        
-        const frag = document.createDocumentFragment();
-        let validCards = 0;
-        
-        books.forEach((book) => {
-          try {
-            const card = renderCard(book);
-            if (card) {
-              frag.appendChild(card);
-              validCards++;
-            }
-          } catch (error) {
-            console.error('Error rendering popular card for book:', book, error);
-          }
-        });
-        
-        // N'ajouter le contenu que s'il y a des éléments valides
-        if (validCards > 0) {
-          container.appendChild(frag);
-          container.classList.remove('empty-container');
-        } else {
-          // Si aucun élément valide n'a été créé, masquer le conteneur
-          container.style.display = 'none';
-          container.classList.add('empty-container');
-          if (noBooks) {
-            noBooks.classList.remove('hidden');
-            noBooks.style.display = '';
-          }
-        }
-      } catch (error) {
-        console.error('Error in renderPopularGrid:', error);
-        // En cas d'erreur, masquer le conteneur et afficher le message d'erreur
-        const container = document.getElementById('popular-books-container');
-        const noBooks = document.getElementById('no-popular-books');
-        
-        if (container) {
-          container.style.display = 'none';
-          container.classList.add('empty-container');
-        }
-        if (noBooks) {
-          noBooks.classList.remove('hidden');
-          noBooks.style.display = '';
-        }
-      }
-    },
-    
-    renderPopularList(books) {
-      console.log('=== renderPopularList called ===');
-      console.log('Books data:', books ? `${books.length} items` : 'null/undefined');
-      
-      let criticalError = false;
-      let errorMessage = '';
-      
-      try {
-        const container = document.getElementById('popular-books-container');
-        const noBooks = document.getElementById('no-popular-books');
-        
-        if (!container) {
-          criticalError = true;
-          errorMessage = 'Popular books container not found';
-          console.error(errorMessage);
-          return;
-        }
-        
-        // Masquer les états de chargement
-        const loading = document.getElementById('popular-books-loading');
-        if (loading) {
-          loading.classList.add('hidden');
-          loading.style.display = 'none';
-        }
-        
-        // S'assurer que le conteneur est vide
-        container.innerHTML = '';
-        
-        // Nettoyer les éléments optimistes avec gestion d'erreur
-        try {
-          viewManager.cleanupOptimisticElements(container);
-        } catch (cleanupError) {
-          console.warn('Error during cleanup in renderPopularList:', cleanupError);
-          // Continuer malgré l'erreur de nettoyage
-        }
-        
-        if (!books || books.length === 0) {
-          console.log('No popular books to display, showing empty state');
-          // Masquer le conteneur s'il n'y a pas de livres
-          container.style.display = 'none';
-          container.classList.add('empty-container');
-          if (noBooks) {
-            noBooks.classList.remove('hidden');
-            noBooks.style.display = '';
-          }
-          return;
-        }
-        
-        // Afficher le conteneur et masquer le message "no books"
-        container.style.display = '';
-        container.classList.remove('empty-container');
-        if (noBooks) {
-          noBooks.classList.add('hidden');
-          noBooks.style.display = 'none';
-        }
-        
-        // Configurer le conteneur pour la vue liste
-        container.classList.remove('grid-view');
-        container.classList.add('list-view');
-        
-        // Créer la structure du tableau avec gestion d'erreur
-        let table, tbody;
-        try {
-          table = document.createElement('div');
-          table.className = 'overflow-x-auto';
-          table.innerHTML = `
-            <table class="w-full border-collapse" style="border-color: var(--border-muted);">
-              <thead>
-                <tr style="background: var(--bg-soft);">
-                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Classement</th>
-                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Preview</th>
-                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Title</th>
-                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Author</th>
-                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Year</th>
-                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="popular-results-tbody">
-                <!-- Les lignes seront injectées ici -->
-              </tbody>
-            </table>
-          `;
-          
-          container.appendChild(table);
-          tbody = document.getElementById('popular-results-tbody');
-          
-          if (!tbody) {
-            throw new Error('Failed to create or find popular results tbody element');
-          }
-        } catch (tableError) {
-          console.error('Error creating popular table structure:', tableError);
-          // Afficher un message d'erreur dans le conteneur mais ne pas le masquer complètement
-          container.innerHTML = `
-            <div class="text-center p-4">
-              <p class="text-red-500 mb-2">Erreur lors de la création du tableau des livres populaires</p>
-              <p class="text-sm opacity-70">${tableError.message}</p>
-              <button onclick="homeSections.renderPopularResults(window.lastPopularResults)" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
-                Réessayer
-              </button>
-            </div>
-          `;
-          return;
-        }
-        
-        // Ajouter chaque livre comme une ligne séparée avec gestion d'erreur individuelle
-        let validRows = 0;
-        let errorCount = 0;
-        
-        books.forEach((book, index) => {
-          try {
-            // Vérification de base des données du livre
-            if (!book || typeof book !== 'object') {
-              console.warn(`Invalid popular book object at index ${index}:`, book);
-              errorCount++;
-              return;
-            }
-            
-            const row = this.createPopularListItem(book, index + 1); // Ajouter 1 pour commencer à 1
-            if (row) {
-              tbody.appendChild(row);
-              validRows++;
-            } else {
-              console.warn(`Failed to render popular row for book at index ${index}:`, book);
-              errorCount++;
-            }
-          } catch (itemError) {
-            console.error(`Error rendering popular list item for book at index ${index}:`, book, itemError);
-            errorCount++;
-            
-            // Ajouter une ligne d'erreur pour ce livre spécifique
-           try {
-             const errorRow = document.createElement('tr');
-             errorRow.className = 'border-b';
-             errorRow.style.borderColor = 'var(--border-muted)';
-             errorRow.innerHTML = `
-               <td colspan="6" class="p-3 text-center text-sm opacity-70">
-                 Erreur d'affichage: ${itemError.message}
-               </td>
-             `;
-             tbody.appendChild(errorRow);
-           } catch (errorRowError) {
-             console.error('Failed to create popular error row:', errorRowError);
-           }
-          }
-        });
-        
-        console.log(`renderPopularList completed: ${validRows} valid rows, ${errorCount} errors`);
-        
-        // Si aucune ligne valide n'a été créée, afficher un message approprié
-        if (validRows === 0) {
-          console.warn('No valid popular rows were created');
-          container.innerHTML = `
-            <div class="text-center p-4">
-              <p class="text-red-500 mb-2">Aucun livre populaire ne peut être affiché</p>
-              <p class="text-sm opacity-70">Vérifiez les données et réessayez</p>
-              <button onclick="homeSections.renderPopularResults(window.lastPopularResults)" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
-                Réessayer
-              </button>
-            </div>
-          `;
-        } else {
-          container.classList.remove('empty-container');
-          
-          // S'il y a eu des erreurs mais que des lignes valides existent, afficher un avertissement
-          if (errorCount > 0) {
-            const warningRow = document.createElement('tr');
-            warningRow.innerHTML = `
-              <td colspan="5" class="p-2 text-center text-xs opacity-70" style="background: var(--bg-soft);">
-                ⚠️ ${errorCount} livre(s) populaire(s) n'ont pas pu être affichés correctement
-              </td>
-            `;
-            tbody.insertBefore(warningRow, tbody.firstChild);
-          }
-        }
-      } catch (error) {
-        criticalError = true;
-        errorMessage = error.message;
-        console.error('Critical error in renderPopularList:', error);
-        console.error('Error stack:', error.stack);
-        
-        // En cas d'erreur critique, afficher un message détaillé mais ne masquer le conteneur qu'en dernier recours
-        const container = document.getElementById('popular-books-container');
-        if (container) {
-          container.innerHTML = `
-            <div class="text-center p-4">
-              <p class="text-red-500 mb-2">Erreur critique lors de l'affichage des livres populaires en liste</p>
-              <p class="text-sm opacity-70">${errorMessage}</p>
-              <button onclick="homeSections.renderPopularResults(window.lastPopularResults)" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
-                Réessayer
-              </button>
-            </div>
-          `;
-        }
-      }
-      
-      // Journalisation pour le débogage
-      if (criticalError) {
-        console.error('renderPopularList failed with critical error:', errorMessage);
-      } else {
-        console.log('renderPopularList completed successfully');
-      }
-    },
-    
-    createPopularListItem(book, rank) {
-      const isAppleBook = book.isAppleBook || false;
-      
-      // Fonction pour nettoyer les données de l'auteur (identique à renderListItem)
-      const cleanAuthor = (author) => {
-        if (!author) return 'Unknown author';
-        
-        // Essayer d'extraire le nom complet (nom + prénom) avant les séparateurs
-        const patterns = [
-          /^(.+?)\s*\[/,  // Avant le premier crochet
-          /^(.+?)\s*;/,   // Avant le premier point-virgule
-          /^(.+?)\s*-\s/, // Avant le premier tiret avec espaces
-          /^(.+?)\s*\(/,  // Avant la première parenthèse
-        ];
-        
-        for (const pattern of patterns) {
-          const match = author.match(pattern);
-          if (match && match[1]) {
-            let cleaned = match[1].trim();
-            
-            // Si le nom contient des virgules, essayer de prendre les deux premières parties (nom, prénom)
-            if (cleaned.includes(',')) {
-              const parts = cleaned.split(',').map(p => p.trim());
-              if (parts.length >= 2) {
-                // Inverser pour avoir "Prénom Nom" au lieu de "Nom, Prénom"
-                cleaned = parts[1] + ' ' + parts[0];
-              } else {
-                cleaned = parts[0];
-              }
-            }
-            
-            // Limiter à un nom raisonnable (max 30 caractères)
-            if (cleaned.length > 30) {
-              const words = cleaned.split(/\s+/);
-              if (words.length >= 2) {
-                // Prendre les deux premiers mots (généralement prénom + nom)
-                cleaned = words.slice(0, 2).join(' ');
-              } else {
-                cleaned = cleaned.substring(0, 30);
-              }
-            }
-            
-            // Vérifier si c'est un nom propre (contient au moins une majuscule)
-            if (/[A-Z]/.test(cleaned) && cleaned.length > 1) {
-              return cleaned;
-            }
-          }
-        }
-        
-        // Si aucun pattern ne correspond, essayer de trouver les deux premiers mots avec majuscules
-        const words = author.split(/\s+/);
-        const capitalizedWords = words.filter(word => /[A-Z]/.test(word) && word.length > 1);
-        
-        if (capitalizedWords.length >= 2) {
-          return capitalizedWords.slice(0, 2).join(' ');
-        } else if (capitalizedWords.length === 1) {
-          return capitalizedWords[0];
-        }
-        
-        // En dernier recours, retourner les deux premiers mots
-        if (words.length >= 2) {
-          return words.slice(0, 2).join(' ');
-        } else {
-          return words[0] || 'Unknown author';
-        }
-      };
-      
-      // Fonction pour nettoyer les dates (prendre seulement la première année)
-      const cleanYear = (year) => {
-        if (!year) return '';
-        
-        // Si l'année contient plusieurs années concaténées, prendre la première
-        const yearMatch = year.match(/(\d{4})/);
-        if (yearMatch) {
-          return yearMatch[1];
-        }
-        
-        return '';
-      };
-      
-      // Cellule Classement
-      const rankCell = document.createElement('td');
-      rankCell.className = 'p-3 font-medium text-center';
-      rankCell.textContent = rank || '-';
-      
-      // Cellule Preview
-      const previewCell = document.createElement('td');
-      previewCell.className = 'p-3';
-      
-      // Vérifier si on est sur mobile (désactiver le zoom sur mobile)
-      const isMobile = window.innerWidth <= 768;
-      
-      if (book.preview && !isMobile) {
-        const coverContainer = document.createElement('div');
-        coverContainer.className = 'cover-zoom-container';
-        
-        const coverImg = document.createElement('img');
-        coverImg.src = utils.e(book.preview);
-        coverImg.alt = 'Cover';
-        coverImg.className = 'book-cover w-12 h-16 object-cover rounded cursor-pointer';
-        coverImg.setAttribute('data-book-id', utils.e(book.id));
-        coverImg.setAttribute('data-src', utils.e(book.preview));
-        
-        // Ajouter le gestionnaire d'événements pour le zoom animé
-        coverImg.addEventListener('click', (e) => {
-          e.stopPropagation();
-          coverZoomManager.showZoomedImage(coverImg);
-        });
-        
-        coverContainer.appendChild(coverImg);
-        previewCell.appendChild(coverContainer);
-      } else if (book.preview && isMobile) {
-        // Sur mobile, juste l'image sans zoom
-        const coverImg = document.createElement('img');
-        coverImg.src = utils.e(book.preview);
-        coverImg.alt = 'Cover';
-        coverImg.className = 'w-12 h-16 object-cover rounded';
-        previewCell.appendChild(coverImg);
-      } else {
-        // Pas d'image disponible
-        const noCover = document.createElement('div');
-        noCover.className = 'w-12 h-16 rounded flex items-center justify-center opacity-70 text-xs';
-        noCover.style.background = 'var(--bg-soft)';
-        noCover.textContent = 'No Cover';
-        previewCell.appendChild(noCover);
-      }
-      
-      // Cellule Title
-      const titleCell = document.createElement('td');
-      titleCell.className = 'p-3 font-medium';
-      titleCell.textContent = utils.e(book.title) || 'Untitled';
-      
-      // Cellule Author (nettoyée)
-      const authorCell = document.createElement('td');
-      authorCell.className = 'p-3';
-      authorCell.textContent = cleanAuthor(book.author);
-      
-      // Cellule Year
-      const yearCell = document.createElement('td');
-      yearCell.className = 'p-3';
-      yearCell.textContent = cleanYear(book.year || book.releaseDate) || '-';
-      
-      // Cellule Actions (verticale)
-      const actionsCell = document.createElement('td');
-      actionsCell.className = 'p-3';
-      const actionsContainer = document.createElement('div');
-      actionsContainer.className = 'flex flex-col gap-1 items-center';
-      
-      const actionBtn = document.createElement('button');
-      actionBtn.className = 'px-2 py-1 rounded border text-xs w-full';
-      actionBtn.style.borderColor = 'var(--border-muted)';
-      actionBtn.textContent = isAppleBook ? 'Search' : 'Details';
-      actionBtn.setAttribute('data-action', isAppleBook ? 'search' : 'details');
-      actionBtn.setAttribute('data-title', utils.e(book.title));
-      
-      if (isAppleBook) {
-        actionBtn.addEventListener('click', () => {
-          this.searchForAppleBook(book.title, book.author);
-        });
-      } else {
-        actionBtn.addEventListener('click', () => {
-          bookDetails.show(book.id);
-        });
-      }
-      
-      actionsContainer.appendChild(actionBtn);
-      actionsCell.appendChild(actionsContainer);
-      
-      // Assembler la ligne
-      const row = document.createElement('tr');
-      row.className = 'border-b';
-      row.style.borderColor = 'var(--border-muted)';
-      if (isAppleBook) {
-        row.classList.add('apple-book-card');
-      }
-      
-      row.appendChild(rankCell);
-      row.appendChild(previewCell);
-      row.appendChild(titleCell);
-      row.appendChild(authorCell);
-      row.appendChild(yearCell);
-      row.appendChild(actionsCell);
-      
-      return row;
     },
     
     createMiniCard(book) {
@@ -4720,207 +4811,16 @@
       el.refreshRecentBtn?.addEventListener('click', () => this.fetchRecentDownloads());
       el.refreshPopularBtn?.addEventListener('click', () => this.fetchPopularBooks());
       
-      // Bind view toggle buttons for popular books
-      console.log('Binding initial popular view buttons...');
-      console.log('el.popularViewGridBtn:', !!el.popularViewGridBtn);
-      console.log('el.popularViewListBtn:', !!el.popularViewListBtn);
-      
-      if (el.popularViewGridBtn) {
-        el.popularViewGridBtn.addEventListener('click', () => {
-          console.log('Initial popular grid button clicked');
-          this.setPopularView(VIEW_MODES.GRID);
-        });
+      // Utiliser le viewManager pour initialiser les boutons de vue popular
+      if (typeof viewManager !== 'undefined') {
+        viewManager.initPopularViewToggle();
       }
-      
-      if (el.popularViewListBtn) {
-        el.popularViewListBtn.addEventListener('click', () => {
-          console.log('Initial popular list button clicked');
-          this.setPopularView(VIEW_MODES.LIST);
-        });
-      }
-      
-      // Initialize view toggle buttons for popular books
-      this.initPopularViewToggle();
       
       // Charger les données initiales
       this.fetchRecentDownloads();
       this.fetchPopularBooks();
     },
     
-    initPopularViewToggle() {
-      // Initialize view toggle buttons for popular books
-      console.log('=== INIT POPULAR VIEW TOGGLE ===');
-      
-      const viewGridBtn = document.getElementById('popular-view-grid');
-      const viewListBtn = document.getElementById('popular-view-list');
-      
-      console.log('viewGridBtn found:', !!viewGridBtn, 'id:', viewGridBtn?.id);
-      console.log('viewListBtn found:', !!viewListBtn, 'id:', viewListBtn?.id);
-      
-      if (viewGridBtn) {
-        viewGridBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log('=== GRID VIEW BUTTON CLICKED (INIT) ===');
-          this.setPopularView(VIEW_MODES.GRID);
-        });
-      }
-      
-      if (viewListBtn) {
-        viewListBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log('=== LIST VIEW BUTTON CLICKED (INIT) ===');
-          this.setPopularView(VIEW_MODES.LIST);
-        });
-      }
-      
-      // S'assurer que les boutons ont les bons attributs
-      if (viewGridBtn) {
-        viewGridBtn.setAttribute('data-view', VIEW_MODES.GRID);
-      }
-      if (viewListBtn) {
-        viewListBtn.setAttribute('data-view', VIEW_MODES.LIST);
-      }
-      
-      console.log('Popular view toggle initialized successfully');
-    },
-    
-    reinitPopularViewButtons() {
-      // Réinitialiser les boutons de vue pour les livres populaires après le chargement dynamique
-      console.log('=== REINITIALIZING POPULAR VIEW BUTTONS ===');
-      console.log('el.popularViewGridBtn:', !!el.popularViewGridBtn);
-      console.log('el.popularViewListBtn:', !!el.popularViewListBtn);
-      
-      // Récupérer les boutons de vue populaires
-      const viewGridBtn = el.popularViewGridBtn || document.getElementById('popular-view-grid');
-      const viewListBtn = el.popularViewListBtn || document.getElementById('popular-view-list');
-      
-      console.log('viewGridBtn found:', !!viewGridBtn, 'id:', viewGridBtn?.id);
-      console.log('viewListBtn found:', !!viewListBtn, 'id:', viewListBtn?.id);
-      
-      if (!viewGridBtn || !viewListBtn) {
-        console.warn('Popular view buttons not found for reinitialization');
-        console.warn('Available buttons with view-toggle class:', document.querySelectorAll('.view-toggle'));
-        return;
-      }
-      
-      // Supprimer tous les gestionnaires d'événements existants en remplaçant les boutons
-      const newGridBtn = viewGridBtn.cloneNode(true);
-      const newListBtn = viewListBtn.cloneNode(true);
-      
-      // Remplacer les anciens boutons par les nouveaux
-      if (viewGridBtn.parentNode) {
-        viewGridBtn.parentNode.replaceChild(newGridBtn, viewGridBtn);
-      }
-      if (viewListBtn.parentNode) {
-        viewListBtn.parentNode.replaceChild(newListBtn, viewListBtn);
-      }
-      
-      // Mettre à jour les références dans l'objet el
-      el.popularViewGridBtn = newGridBtn;
-      el.popularViewListBtn = newListBtn;
-      
-      // Forcer la mise à jour de la référence du conteneur
-      el.popularViewToggleContainer = document.getElementById('popular-view-toggle-container');
-      
-      // Ajouter les nouveaux gestionnaires d'événements avec une vérification explicite
-      const gridClickHandler = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('=== POPULAR GRID VIEW BUTTON CLICKED ===');
-        this.setPopularView(VIEW_MODES.GRID);
-      };
-      
-      const listClickHandler = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('=== POPULAR LIST VIEW BUTTON CLICKED ===');
-        this.setPopularView(VIEW_MODES.LIST);
-      };
-      
-      newGridBtn.addEventListener('click', gridClickHandler);
-      newListBtn.addEventListener('click', listClickHandler);
-      
-      // S'assurer que les boutons ont les bons attributs
-      newGridBtn.setAttribute('data-view', VIEW_MODES.GRID);
-      newListBtn.setAttribute('data-view', VIEW_MODES.LIST);
-      
-      console.log('Event listeners attached to buttons');
-      console.log('Grid button data-view:', newGridBtn.getAttribute('data-view'));
-      console.log('List button data-view:', newListBtn.getAttribute('data-view'));
-      
-      // Mettre à jour l'état visuel des boutons avec un petit délai pour s'assurer que le DOM est prêt
-      setTimeout(() => {
-        console.log('Updating initial view state...');
-        this.setPopularView(this.getPopularViewMode());
-      }, 50);
-      
-      console.log('Popular view buttons reinitialized successfully');
-    },
-
-    setPopularView(viewMode) {
-      console.log('=== SET POPULAR VIEW CALLED ===');
-      console.log('viewMode:', viewMode);
-      console.log('window.lastPopularResults:', window.lastPopularResults ? `${window.lastPopularResults.length} items` : 'null/undefined');
-      
-      // Valider le mode de vue
-      if (viewMode !== VIEW_MODES.GRID && viewMode !== VIEW_MODES.LIST) {
-        console.error('Invalid view mode:', viewMode, 'Defaulting to GRID');
-        viewMode = VIEW_MODES.GRID;
-      }
-      
-      // Mettre à jour les boutons avec une référence dynamique
-      const container = el.popularViewToggleContainer || document.getElementById('popular-view-toggle-container');
-      console.log('container found:', !!container, 'id:', container?.id);
-      
-      if (container) {
-        const allButtons = container.querySelectorAll('.view-toggle');
-        console.log('Found buttons:', allButtons.length);
-        
-        let activeButtonFound = false;
-        container.querySelectorAll('.view-toggle').forEach(btn => {
-          const btnView = btn.getAttribute('data-view');
-          console.log('Button:', btn.id, 'data-view:', btnView, 'current viewMode:', viewMode);
-          
-          if (btn.getAttribute('data-view') === viewMode) {
-            btn.classList.add('active');
-            activeButtonFound = true;
-            console.log('Added active class to:', btn.id);
-          } else {
-            btn.classList.remove('active');
-            console.log('Removed active class from:', btn.id);
-          }
-        });
-        
-        if (!activeButtonFound) {
-          console.warn('No active button found for view mode:', viewMode);
-        }
-      } else {
-        console.error('Popular view toggle container not found!');
-      }
-      
-      // Mettre à jour le conteneur de livres populaires avec les classes appropriées
-      const popularContainer = document.getElementById('popular-books-container');
-      if (popularContainer) {
-        console.log('Updating popular container classes');
-        popularContainer.classList.remove('grid-view', 'list-view');
-        popularContainer.classList.add(`${viewMode}-view`);
-        console.log('Added class:', `${viewMode}-view`);
-      } else {
-        console.error('Popular books container not found!');
-      }
-      
-      // Re-render les résultats avec la nouvelle vue
-      const currentData = window.lastPopularResults || [];
-      console.log('Calling renderPopularResults with data:', currentData.length, 'items');
-      
-      if (currentData.length > 0) {
-        this.renderPopularResults(currentData);
-      } else {
-        console.log('No popular books data to render');
-      }
-    },
     
     clearPopularBooksCache() {
       try {
