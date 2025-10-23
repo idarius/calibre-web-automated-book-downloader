@@ -5,26 +5,14 @@
   // ---- Navigation State ----
   const navigation = {
     currentPage: 'home',
-    isSidebarCollapsed: false,
     isMobileMenuOpen: false,
     
     init() {
-      this.setupSidebarToggle();
       this.setupMobileMenu();
       this.setupNavigationLinks();
       this.setupDownloadsLink();
       this.loadInitialState();
-    },
-    
-    setupSidebarToggle() {
-      const toggleBtn = document.getElementById('sidebar-collapse-toggle');
-      const sidebar = document.getElementById('sidebar');
-      
-      if (toggleBtn && sidebar) {
-        toggleBtn.addEventListener('click', () => {
-          this.toggleSidebar();
-        });
-      }
+      this.setupScrollMonitoring();
     },
     
     setupMobileMenu() {
@@ -63,6 +51,16 @@
           link.addEventListener('click', (e) => {
             // Toujours utiliser la navigation SPA pour toutes les pages
             e.preventDefault();
+            
+            // DEBUG: Log scroll position before navigation
+            console.log(`DEBUG: Navigation link clicked - Current scroll position:`, {
+              scrollX: window.scrollX,
+              scrollY: window.scrollY,
+              pageElement: document.documentElement.scrollTop,
+              bodyElement: document.body.scrollTop,
+              targetPage: item.getAttribute('data-page')
+            });
+            
             const targetPage = item.getAttribute('data-page');
             const hashUrl = '/' + (targetPage === 'home' ? '' : '#' + targetPage);
             this.navigateToPage(targetPage, hashUrl);
@@ -75,8 +73,18 @@
         const target = e.target.closest('a[href="/#search"], a[href="/#popular"]');
         if (target) {
           e.preventDefault();
+          
+          // DEBUG: Log scroll position before content navigation
           const href = target.getAttribute('href');
           const page = href.includes('/#search') ? 'search' : 'popular';
+          console.log(`DEBUG: Content navigation link clicked - Current scroll position:`, {
+            scrollX: window.scrollX,
+            scrollY: window.scrollY,
+            pageElement: document.documentElement.scrollTop,
+            bodyElement: document.body.scrollTop,
+            targetPage: page
+          });
+          
           this.navigateToPage(page, href);
         }
       });
@@ -102,16 +110,6 @@
       }
     },
     
-    toggleSidebar() {
-      const sidebar = document.getElementById('sidebar');
-      if (sidebar) {
-        this.isSidebarCollapsed = !this.isSidebarCollapsed;
-        sidebar.classList.toggle('collapsed');
-        
-        // Save preference
-        localStorage.setItem('sidebar-collapsed', this.isSidebarCollapsed.toString());
-      }
-    },
     
     toggleMobileMenu() {
       if (this.isMobileMenuOpen) {
@@ -149,10 +147,90 @@
       }
     },
     
+    // Fonction pour réinitialiser la position de défilement en haut de la page
+    resetScrollPosition() {
+      console.log('=== RESETTING SCROLL POSITION ===');
+      console.log('Before reset - Current scroll position:', {
+        scrollX: window.scrollX,
+        scrollY: window.scrollY,
+        pageElement: document.documentElement.scrollTop,
+        bodyElement: document.body.scrollTop
+      });
+      
+      // Utiliser requestAnimationFrame pour garantir l'exécution après le rendu
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        
+        // Pour les conteneurs avec défilement interne
+        const scrollableContainers = document.querySelectorAll('[id$="-page"]');
+        scrollableContainers.forEach(container => {
+          container.scrollTop = 0;
+        });
+        
+        console.log('After reset - New scroll position:', {
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+          pageElement: document.documentElement.scrollTop,
+          bodyElement: document.body.scrollTop
+        });
+      });
+    },
+    
+    // Configuration du monitoring de défilement pour le débogage
+    setupScrollMonitoring() {
+      let lastScrollY = 0;
+      let lastScrollX = 0;
+      
+      // Observer les changements de position de défilement
+      const scrollObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            console.log('DEBUG: Element scrolled into view:', entry.target.id);
+          }
+        });
+      });
+      
+      // Surveiller les changements de défilement
+      window.addEventListener('scroll', () => {
+        const currentScrollY = window.scrollY;
+        const currentScrollX = window.scrollX;
+        
+        // Détecter les changements significatifs
+        if (Math.abs(currentScrollY - lastScrollY) > 50 || Math.abs(currentScrollX - lastScrollX) > 50) {
+          console.log('DEBUG: Significant scroll change detected:', {
+            from: { x: lastScrollX, y: lastScrollY },
+            to: { x: currentScrollX, y: currentScrollY },
+            page: this.currentPage
+          });
+          
+          lastScrollY = currentScrollY;
+          lastScrollX = currentScrollX;
+        }
+      }, { passive: true });
+      
+      // Observer les conteneurs de page
+      setTimeout(() => {
+        const pageContainers = document.querySelectorAll('[id$="-page"]');
+        pageContainers.forEach(container => {
+          scrollObserver.observe(container);
+        });
+      }, 1000);
+    },
+    
     async navigateToPage(page, url) {
       if (page === this.currentPage) return;
       
       try {
+        // DEBUG: Log current scroll position before navigation
+        console.log(`DEBUG: Navigation to ${page} - Current scroll position:`, {
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+          pageElement: document.documentElement.scrollTop,
+          bodyElement: document.body.scrollTop
+        });
+        
         // Show loading state
         this.showPageLoading();
         
@@ -177,9 +255,28 @@
         // Hide loading state
         this.hidePageLoading();
         
+        // Reset scroll position after loading content
+        this.resetScrollPosition();
+        
+        // DEBUG: Log scroll position after content load but before initialization
+        console.log(`DEBUG: After loading ${page} content - Scroll position:`, {
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+          pageElement: document.documentElement.scrollTop,
+          bodyElement: document.body.scrollTop
+        });
+        
         // Initialize page-specific functionality with delay
         setTimeout(() => {
           this.initializePage(page);
+          
+          // DEBUG: Log scroll position after page initialization
+          console.log(`DEBUG: After initializing ${page} - Scroll position:`, {
+            scrollX: window.scrollX,
+            scrollY: window.scrollY,
+            pageElement: document.documentElement.scrollTop,
+            bodyElement: document.body.scrollTop
+          });
         }, 50);
         
       } catch (error) {
@@ -234,6 +331,14 @@
     async loadPageContent(page) {
       console.log(`=== loadPageContent called for: ${page} ===`);
       
+      // DEBUG: Log scroll position at the beginning of loadPageContent
+      console.log(`DEBUG: loadPageContent(${page}) - Initial scroll position:`, {
+        scrollX: window.scrollX,
+        scrollY: window.scrollY,
+        pageElement: document.documentElement.scrollTop,
+        bodyElement: document.body.scrollTop
+      });
+      
       // Hide all page containers first
       const allPages = document.querySelectorAll('[id$="-page"]');
       console.log(`Found ${allPages.length} page containers`);
@@ -254,6 +359,14 @@
       if (page === 'home') {
         console.log('Loading home page (content already in HTML)');
         targetPage.classList.remove('hidden');
+        
+        // DEBUG: Log scroll position after showing home page
+        console.log(`DEBUG: After showing home page - Scroll position:`, {
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+          pageElement: document.documentElement.scrollTop,
+          bodyElement: document.body.scrollTop
+        });
         return;
       }
       
@@ -261,10 +374,19 @@
       targetPage.classList.remove('hidden');
       console.log(`Made ${page}-page visible`);
       
-      // For search and popular pages, fetch content
+      // DEBUG: Log scroll position after making page visible
+      console.log(`DEBUG: After making ${page} visible - Scroll position:`, {
+        scrollX: window.scrollX,
+        scrollY: window.scrollY,
+        pageElement: document.documentElement.scrollTop,
+        bodyElement: document.body.scrollTop
+      });
+      
+      // For search, popular and admin pages, fetch content
       const contentMap = {
         'search': this.getSearchContent(),
-        'popular': this.getPopularContent()
+        'popular': this.getPopularContent(),
+        'admin': this.getAdminContent()
       };
       
       const content = contentMap[page];
@@ -296,11 +418,27 @@
         targetPage.innerHTML = finalContent;
         console.log(`Content set successfully for page: ${page}, innerHTML length: ${targetPage.innerHTML.length}`);
         
+        // DEBUG: Log scroll position after setting content
+        console.log(`DEBUG: After setting ${page} content - Scroll position:`, {
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+          pageElement: document.documentElement.scrollTop,
+          bodyElement: document.body.scrollTop
+        });
+        
         // For search and popular pages, we need to ensure the content is properly structured
         if (page === 'search' || page === 'popular') {
           // Add a small delay to ensure DOM is updated before initializing
           await new Promise(resolve => setTimeout(resolve, 50));
           console.log(`Delay added for ${page} page initialization`);
+          
+          // DEBUG: Log scroll position after delay
+          console.log(`DEBUG: After ${page} delay - Scroll position:`, {
+            scrollX: window.scrollX,
+            scrollY: window.scrollY,
+            pageElement: document.documentElement.scrollTop,
+            bodyElement: document.body.scrollTop
+          });
         }
         
       } catch (contentError) {
@@ -411,6 +549,66 @@
       }
     },
     
+    async getAdminContent() {
+      try {
+        const response = await fetch('/request/admin');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        
+        // Validate response structure
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid response format');
+        }
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        const content = data.content || '';
+        if (!content || content.trim() === '') {
+          throw new Error('Empty content received');
+        }
+        
+        return content;
+      } catch (error) {
+        console.error('Error loading admin content:', error);
+        // Return fallback content instead of throwing
+        return `
+          <div class="text-center py-8">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-red-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-lg font-medium mb-2">Erreur lors du chargement de la page d'administration</p>
+            <p class="text-sm opacity-70 mb-4">Veuillez réessayer plus tard</p>
+            <button onclick="navigation.navigateToPage('admin', '/admin')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md">
+              Réessayer
+            </button>
+          </div>
+        `;
+      }
+    },
+    
+    initializeAdminPage() {
+      // Initialisation de la page d'administration
+      console.log('Initializing admin page...');
+      
+      // Ajouter un petit délai pour s'assurer que le DOM est prêt
+      setTimeout(() => {
+        // Lier les boutons ou formulaires spécifiques à l'administration
+        const adminButtons = document.querySelectorAll('[data-admin-action]');
+        adminButtons.forEach(button => {
+          button.addEventListener('click', (e) => {
+            e.preventDefault();
+            const action = button.getAttribute('data-admin-action');
+            console.log(`Admin action triggered: ${action}`);
+            // Ajoutez ici la logique pour chaque action d'administration
+          });
+        });
+        
+        console.log('Admin page initialized successfully');
+      }, 100);
+    },
+    
     showPageLoading() {
       const pageContent = document.getElementById('page-content');
       if (pageContent) {
@@ -432,6 +630,9 @@
           break;
         case 'popular':
           this.initializePopularPage();
+          break;
+        case 'admin':
+          this.initializeAdminPage();
           break;
       }
     },
@@ -544,8 +745,8 @@
           
           // Ajouter un petit délai pour s'assurer que les éléments sont disponibles
           setTimeout(() => {
-            viewManager.updateViewButtons();
-            console.log('View manager initialized for search page');
+            viewManager.reinitViewButtons();
+            console.log('View manager reinitialized for search page');
           }, 50);
         } else {
           console.error('View manager not available');
@@ -688,7 +889,7 @@
     initializePopularPage() {
       // Re-initialize popular books functionality if it exists
       if (typeof homeSections !== 'undefined') {
-        console.log('Initializing popular page...');
+        console.log('=== INITIALIZING POPULAR PAGE ===');
         
         // Make sure DOM elements exist before trying to use them
         const initWithRetry = (retryCount = 0) => {
@@ -698,13 +899,18 @@
               const container = document.getElementById('popular-books-container');
               const loading = document.getElementById('popular-books-loading');
               const noBooks = document.getElementById('no-popular-books');
+              const viewGridBtn = document.getElementById('popular-view-grid');
+              const viewListBtn = document.getElementById('popular-view-list');
+              const viewToggleContainer = document.getElementById('popular-view-toggle-container');
               
-              console.log('Popular page elements check:', {
-                container: !!container,
-                loading: !!loading,
-                noBooks: !!noBooks,
-                retryCount
-              });
+              console.log('=== POPULAR PAGE ELEMENTS CHECK ===');
+              console.log('container:', !!container, 'id:', container?.id);
+              console.log('loading:', !!loading, 'id:', loading?.id);
+              console.log('noBooks:', !!noBooks, 'id:', noBooks?.id);
+              console.log('viewGridBtn:', !!viewGridBtn, 'id:', viewGridBtn?.id);
+              console.log('viewListBtn:', !!viewListBtn, 'id:', viewListBtn?.id);
+              console.log('viewToggleContainer:', !!viewToggleContainer, 'id:', viewToggleContainer?.id);
+              console.log('retryCount:', retryCount);
               
               if (!container || !loading) {
                 console.warn('Popular page elements not found, retrying...');
@@ -718,7 +924,8 @@
               }
               
               // Initialize view toggle buttons first
-              homeSections.initPopularViewToggle();
+              console.log('Calling reinitPopularViewButtons...');
+              homeSections.reinitPopularViewButtons();
               
               // Fetch popular books immediately
               console.log('Initializing popular page, fetching books...');
@@ -788,21 +995,12 @@
       console.log('Current URL:', window.location.href);
       console.log('Current hash:', window.location.hash);
       
-      // Load sidebar collapsed state
-      const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
-      if (isCollapsed) {
-        const sidebar = document.getElementById('sidebar');
-        if (sidebar) {
-          sidebar.classList.add('collapsed');
-          this.isSidebarCollapsed = true;
-        }
-      }
       
       // Déterminer la page depuis l'URL
       let page = 'home';
       const hash = window.location.hash.substring(1); // Enlever le #
       
-      if (hash === 'search' || hash === 'popular') {
+      if (hash === 'search' || hash === 'popular' || hash === 'admin') {
         page = hash;
         console.log(`Hash detected: ${hash}, setting page to: ${page}`);
       } else {
@@ -813,6 +1011,8 @@
           page = 'search';
         } else if (path.includes('/popular')) {
           page = 'popular';
+        } else if (path.includes('/admin')) {
+          page = 'admin';
         }
         
         // Vérifier si nous sommes sur une page directe (/search ou /popular)
@@ -860,16 +1060,29 @@
         // Masquer les autres pages
         const searchPage = document.getElementById('search-page');
         const popularPage = document.getElementById('popular-page');
+        const adminPage = document.getElementById('admin-page');
         if (searchPage) searchPage.classList.add('hidden');
         if (popularPage) popularPage.classList.add('hidden');
+        if (adminPage) adminPage.classList.add('hidden');
       }
       
       // Handle browser back/forward
       window.addEventListener('popstate', (e) => {
         console.log('Popstate event detected:', e.state);
+        
+        // DEBUG: Log scroll position on popstate
+        console.log(`DEBUG: Popstate event - Current scroll position:`, {
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+          pageElement: document.documentElement.scrollTop,
+          bodyElement: document.body.scrollTop
+        });
+        
         if (e.state && e.state.page) {
           this.navigateToPage(e.state.page, window.location.pathname);
         } else {
+          // Reset scroll position on popstate when no state is available
+          this.resetScrollPosition();
           // Gérer le cas où l'état est vide (rafraîchissement de page avec hash)
           const currentHash = window.location.hash.substring(1);
           const currentPath = window.location.pathname;
@@ -882,12 +1095,18 @@
           } else if (currentHash === 'popular') {
             currentPage = 'popular';
             currentUrl = '/#popular';
+          } else if (currentHash === 'admin') {
+            currentPage = 'admin';
+            currentUrl = '/#admin';
           } else if (currentPath.includes('/search')) {
             currentPage = 'search';
             currentUrl = '/search';
           } else if (currentPath.includes('/popular')) {
             currentPage = 'popular';
             currentUrl = '/popular';
+          } else if (currentPath.includes('/admin')) {
+            currentPage = 'admin';
+            currentUrl = '/admin';
           }
           
           console.log('Navigating to page from popstate:', currentPage, currentUrl);
@@ -900,17 +1119,29 @@
         const newHash = window.location.hash.substring(1);
         console.log('Hash change detected:', newHash);
         
+        // DEBUG: Log scroll position on hashchange
+        console.log(`DEBUG: Hashchange event - Current scroll position:`, {
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+          pageElement: document.documentElement.scrollTop,
+          bodyElement: document.body.scrollTop,
+          newHash
+        });
+        
         // Éviter les navigations en double
         if (newHash === this.currentPage) {
           console.log('Already on this page, skipping navigation');
           return;
         }
         
-        if (newHash === 'search' || newHash === 'popular') {
+        if (newHash === 'search' || newHash === 'popular' || newHash === 'admin') {
           const hashUrl = '/#' + newHash;
           this.navigateToPage(newHash, hashUrl);
         } else if (newHash === '' || newHash === 'home') {
           this.navigateToPage('home', '/');
+        } else {
+          // Reset scroll position for unknown hash changes
+          this.resetScrollPosition();
         }
       });
     },
@@ -935,6 +1166,9 @@
         
         // Charger le contenu
         await this.loadPageContent(page);
+        
+        // Reset scroll position for initial page load
+        this.resetScrollPosition();
         
         // Initialiser les fonctionnalités de la page
         setTimeout(() => {
@@ -1151,7 +1385,6 @@
     popularViewListBtn: document.getElementById('popular-view-list'),
     popularViewToggleContainer: document.getElementById('popular-view-toggle-container'),
     // Sidebar elements
-    sidebarToggle: document.getElementById('sidebar-toggle'),
     sidebarBadge: document.getElementById('sidebar-badge'),
     sidebarOverlay: document.getElementById('sidebar-overlay'),
     sidebarPanel: document.getElementById('sidebar-panel'),
@@ -1693,6 +1926,41 @@
       }
     },
     
+    reinitViewButtons() {
+      // Réinitialiser les boutons de vue après le chargement dynamique du contenu
+      console.log('Reinitializing view buttons for search page');
+      
+      // Récupérer les boutons de vue
+      const viewGridBtn = el.viewGridBtn || document.getElementById('view-grid');
+      const viewListBtn = el.viewListBtn || document.getElementById('view-list');
+      
+      if (!viewGridBtn || !viewListBtn) {
+        console.warn('View buttons not found for reinitialization');
+        return;
+      }
+      
+      // Cloner les boutons pour supprimer les anciens gestionnaires d'événements
+      const newGridBtn = viewGridBtn.cloneNode(true);
+      const newListBtn = viewListBtn.cloneNode(true);
+      
+      // Remplacer les anciens boutons par les nouveaux
+      viewGridBtn.parentNode.replaceChild(newGridBtn, viewGridBtn);
+      viewListBtn.parentNode.replaceChild(newListBtn, viewListBtn);
+      
+      // Mettre à jour les références dans l'objet el
+      el.viewGridBtn = newGridBtn;
+      el.viewListBtn = newListBtn;
+      
+      // Ajouter les nouveaux gestionnaires d'événements
+      newGridBtn.addEventListener('click', () => this.setView(VIEW_MODES.GRID));
+      newListBtn.addEventListener('click', () => this.setView(VIEW_MODES.LIST));
+      
+      // Mettre à jour l'état visuel des boutons
+      this.updateViewButtons();
+      
+      console.log('View buttons reinitialized successfully');
+    },
+    
     setView(viewMode) {
       if (this.currentView === viewMode) return;
       
@@ -1841,6 +2109,12 @@
     },
     
     renderList(books) {
+      console.log('=== renderList called ===');
+      console.log('Books data:', books ? `${books.length} items` : 'null/undefined');
+      
+      let criticalError = false;
+      let errorMessage = '';
+      
       try {
         // Vérifier que resultsContainer existe
         if (!el.resultsContainer) {
@@ -1853,7 +2127,9 @@
           // Si toujours null, essayer de récupérer directement
           el.resultsContainer = document.getElementById('results-container');
           if (!el.resultsContainer) {
-            console.error('Results container still not found after refresh');
+            criticalError = true;
+            errorMessage = 'Results container not found after refresh attempts';
+            console.error(errorMessage);
             return;
           }
         }
@@ -1869,10 +2145,16 @@
         el.resultsContainer.innerHTML = '';
         
         // Nettoyer les éléments optimistes qui pourraient encore être présents
-        this.cleanupOptimisticElements(el.resultsContainer);
+        try {
+          this.cleanupOptimisticElements(el.resultsContainer);
+        } catch (cleanupError) {
+          console.warn('Error during cleanup:', cleanupError);
+          // Continuer malgré l'erreur de nettoyage
+        }
         
         // Vérifier si nous avons des livres à afficher
         if (!books || books.length === 0) {
+          console.log('No books to display, showing empty state');
           // Masquer le conteneur s'il n'y a pas de résultats pour éviter le cadre vide
           el.resultsContainer.style.display = 'none';
           el.resultsContainer.classList.add('empty-container');
@@ -1891,69 +2173,148 @@
           el.noResults.style.display = 'none';
         }
         
-        // Créer la structure du tableau
-        const table = document.createElement('div');
-        table.className = 'overflow-x-auto';
-        table.innerHTML = `
-          <table class="w-full border-collapse" style="border-color: var(--border-muted);">
-            <thead>
-              <tr style="background: var(--bg-soft);">
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Preview</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Title</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Author</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Publisher</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Year</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Language</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Format</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Size</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="results-tbody">
-              <!-- Les lignes seront injectées ici -->
-            </tbody>
-          </table>
-        `;
+        // Créer la structure du tableau avec gestion d'erreur
+        let table, tbody;
+        try {
+          table = document.createElement('div');
+          table.className = 'overflow-x-auto';
+          table.innerHTML = `
+            <table class="w-full border-collapse" style="border-color: var(--border-muted);">
+              <thead>
+                <tr style="background: var(--bg-soft);">
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Preview</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Title</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Author</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Publisher</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Year</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Language</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Format</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Size</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="results-tbody">
+                <!-- Les lignes seront injectées ici -->
+              </tbody>
+            </table>
+          `;
+          
+          el.resultsContainer.appendChild(table);
+          tbody = document.getElementById('results-tbody');
+          
+          if (!tbody) {
+            throw new Error('Failed to create or find tbody element');
+          }
+        } catch (tableError) {
+          console.error('Error creating table structure:', tableError);
+          // Afficher un message d'erreur dans le conteneur mais ne pas le masquer complètement
+          el.resultsContainer.innerHTML = `
+            <div class="text-center p-4">
+              <p class="text-red-500 mb-2">Erreur lors de la création du tableau</p>
+              <p class="text-sm opacity-70">${tableError.message}</p>
+              <button onclick="viewManager.renderList(window.lastSearchResults)" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
+                Réessayer
+              </button>
+            </div>
+          `;
+          return;
+        }
         
-        el.resultsContainer.appendChild(table);
-        const tbody = document.getElementById('results-tbody');
-        
-        // Ajouter chaque livre comme une ligne séparée avec gestion d'erreur
+        // Ajouter chaque livre comme une ligne séparée avec gestion d'erreur individuelle
         let validRows = 0;
-        books.forEach((book) => {
+        let errorCount = 0;
+        
+        books.forEach((book, index) => {
           try {
+            // Vérification de base des données du livre
+            if (!book || typeof book !== 'object') {
+              console.warn(`Invalid book object at index ${index}:`, book);
+              errorCount++;
+              return;
+            }
+            
             const row = renderListItem(book);
             if (row) {
               tbody.appendChild(row);
               validRows++;
+            } else {
+              console.warn(`Failed to render row for book at index ${index}:`, book);
+              errorCount++;
             }
-          } catch (error) {
-            console.error('Error rendering list item for book:', book, error);
+          } catch (itemError) {
+            console.error(`Error rendering list item for book at index ${index}:`, book, itemError);
+            errorCount++;
+            
+            // Ajouter une ligne d'erreur pour ce livre spécifique
+            try {
+              const errorRow = document.createElement('tr');
+              errorRow.className = 'border-b';
+              errorRow.style.borderColor = 'var(--border-muted)';
+              errorRow.innerHTML = `
+                <td colspan="9" class="p-3 text-center text-sm opacity-70">
+                  Erreur d'affichage: ${itemError.message}
+                </td>
+              `;
+              tbody.appendChild(errorRow);
+            } catch (errorRowError) {
+              console.error('Failed to create error row:', errorRowError);
+            }
           }
         });
         
-        // Si aucune ligne valide n'a été créée, masquer le conteneur
+        console.log(`renderList completed: ${validRows} valid rows, ${errorCount} errors`);
+        
+        // Si aucune ligne valide n'a été créée, afficher un message approprié
         if (validRows === 0) {
-          el.resultsContainer.style.display = 'none';
-          el.resultsContainer.classList.add('empty-container');
-          if (el.noResults) {
-            utils.show(el.noResults);
-            el.noResults.style.display = '';
-          }
+          console.warn('No valid rows were created');
+          el.resultsContainer.innerHTML = `
+            <div class="text-center p-4">
+              <p class="text-red-500 mb-2">Aucun livre ne peut être affiché</p>
+              <p class="text-sm opacity-70">Vérifiez les données et réessayez</p>
+              <button onclick="viewManager.renderList(window.lastSearchResults)" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
+                Réessayer
+              </button>
+            </div>
+          `;
         } else {
           el.resultsContainer.classList.remove('empty-container');
+          
+          // S'il y a eu des erreurs mais que des lignes valides existent, afficher un avertissement
+          if (errorCount > 0) {
+            const warningRow = document.createElement('tr');
+            warningRow.innerHTML = `
+              <td colspan="9" class="p-2 text-center text-xs opacity-70" style="background: var(--bg-soft);">
+                ⚠️ ${errorCount} livre(s) n'ont pas pu être affichés correctement
+              </td>
+            `;
+            tbody.insertBefore(warningRow, tbody.firstChild);
+          }
         }
       } catch (error) {
-        console.error('Error in renderList:', error);
-        // En cas d'erreur, masquer le conteneur et afficher le message d'erreur
+        criticalError = true;
+        errorMessage = error.message;
+        console.error('Critical error in renderList:', error);
+        console.error('Error stack:', error.stack);
+        
+        // En cas d'erreur critique, afficher un message détaillé mais ne masquer le conteneur qu'en dernier recours
         if (el.resultsContainer) {
-          el.resultsContainer.style.display = 'none';
-          el.resultsContainer.classList.add('empty-container');
+          el.resultsContainer.innerHTML = `
+            <div class="text-center p-4">
+              <p class="text-red-500 mb-2">Erreur critique lors de l'affichage en liste</p>
+              <p class="text-sm opacity-70">${errorMessage}</p>
+              <button onclick="viewManager.renderList(window.lastSearchResults)" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
+                Réessayer
+              </button>
+            </div>
+          `;
         }
-        if (el.noResults) {
-          utils.show(el.noResults);
-          el.noResults.style.display = '';
-        }
+      }
+      
+      // Journalisation pour le débogage
+      if (criticalError) {
+        console.error('renderList failed with critical error:', errorMessage);
+      } else {
+        console.log('renderList completed successfully');
       }
     },
     
@@ -2468,7 +2829,6 @@
     
     init() {
       // Bind toggle events
-      el.sidebarToggle?.addEventListener('click', () => this.toggle());
       el.sidebarClose?.addEventListener('click', () => this.close());
       el.sidebarOverlay?.addEventListener('click', () => this.close());
       
@@ -2499,10 +2859,6 @@
           this.close();
         }
       });
-      
-      // Initial status fetch without loader (background) - only if sidebar will be used
-      // Don't start automatic fetching to reduce unnecessary requests
-      // this.fetchStatus(false);
       
       // Initialize with clean state instead of calling ensureValidState
       if (el.sidebarStatusList) {
@@ -3093,7 +3449,7 @@
         // Remove after transition
         setTimeout(() => {
           if (optimisticItem.parentNode) {
-            optimisticItem.remove();
+            optimisticItem.parentNode.removeChild(optimisticItem);
           }
         }, 300);
       }
@@ -3790,9 +4146,19 @@
     },
     
     getPopularViewMode() {
-      // Récupérer la vue actuelle depuis les boutons
-      const activeBtn = el.popularViewToggleContainer?.querySelector('.view-toggle.active');
-      return activeBtn?.getAttribute('data-view') || VIEW_MODES.GRID;
+      console.log('=== GET POPULAR VIEW MODE ===');
+      
+      // Récupérer la vue actuelle depuis les boutons avec une référence dynamique
+      const container = el.popularViewToggleContainer || document.getElementById('popular-view-toggle-container');
+      console.log('container found:', !!container, 'id:', container?.id);
+      
+      const activeBtn = container?.querySelector('.view-toggle.active');
+      console.log('activeBtn found:', !!activeBtn, 'id:', activeBtn?.id, 'data-view:', activeBtn?.getAttribute('data-view'));
+      
+      const viewMode = activeBtn?.getAttribute('data-view') || VIEW_MODES.GRID;
+      console.log('Returning viewMode:', viewMode);
+      
+      return viewMode;
     },
     
     renderPopularGrid(books) {
@@ -3887,12 +4253,20 @@
     },
     
     renderPopularList(books) {
+      console.log('=== renderPopularList called ===');
+      console.log('Books data:', books ? `${books.length} items` : 'null/undefined');
+      
+      let criticalError = false;
+      let errorMessage = '';
+      
       try {
         const container = document.getElementById('popular-books-container');
         const noBooks = document.getElementById('no-popular-books');
         
         if (!container) {
-          console.error('Popular books container not found');
+          criticalError = true;
+          errorMessage = 'Popular books container not found';
+          console.error(errorMessage);
           return;
         }
         
@@ -3906,10 +4280,16 @@
         // S'assurer que le conteneur est vide
         container.innerHTML = '';
         
-        // Nettoyer les éléments optimistes
-        viewManager.cleanupOptimisticElements(container);
+        // Nettoyer les éléments optimistes avec gestion d'erreur
+        try {
+          viewManager.cleanupOptimisticElements(container);
+        } catch (cleanupError) {
+          console.warn('Error during cleanup in renderPopularList:', cleanupError);
+          // Continuer malgré l'erreur de nettoyage
+        }
         
         if (!books || books.length === 0) {
+          console.log('No popular books to display, showing empty state');
           // Masquer le conteneur s'il n'y a pas de livres
           container.style.display = 'none';
           container.classList.add('empty-container');
@@ -3932,101 +4312,269 @@
         container.classList.remove('grid-view');
         container.classList.add('list-view');
         
-        // Créer la structure du tableau
-        const table = document.createElement('div');
-        table.className = 'overflow-x-auto';
-        table.innerHTML = `
-          <table class="w-full border-collapse" style="border-color: var(--border-muted);">
-            <thead>
-              <tr style="background: var(--bg-soft);">
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Preview</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Title</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Author</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Publisher</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Year</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Language</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Format</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Size</th>
-                <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="popular-results-tbody">
-              <!-- Les lignes seront injectées ici -->
-            </tbody>
-          </table>
-        `;
+        // Créer la structure du tableau avec gestion d'erreur
+        let table, tbody;
+        try {
+          table = document.createElement('div');
+          table.className = 'overflow-x-auto';
+          table.innerHTML = `
+            <table class="w-full border-collapse" style="border-color: var(--border-muted);">
+              <thead>
+                <tr style="background: var(--bg-soft);">
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Classement</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Preview</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Title</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Author</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Year</th>
+                  <th class="p-3 text-left font-semibold border-b" style="border-color: var(--border-muted);">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="popular-results-tbody">
+                <!-- Les lignes seront injectées ici -->
+              </tbody>
+            </table>
+          `;
+          
+          container.appendChild(table);
+          tbody = document.getElementById('popular-results-tbody');
+          
+          if (!tbody) {
+            throw new Error('Failed to create or find popular results tbody element');
+          }
+        } catch (tableError) {
+          console.error('Error creating popular table structure:', tableError);
+          // Afficher un message d'erreur dans le conteneur mais ne pas le masquer complètement
+          container.innerHTML = `
+            <div class="text-center p-4">
+              <p class="text-red-500 mb-2">Erreur lors de la création du tableau des livres populaires</p>
+              <p class="text-sm opacity-70">${tableError.message}</p>
+              <button onclick="homeSections.renderPopularResults(window.lastPopularResults)" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
+                Réessayer
+              </button>
+            </div>
+          `;
+          return;
+        }
         
-        container.appendChild(table);
-        const tbody = document.getElementById('popular-results-tbody');
-        
-        // Ajouter chaque livre comme une ligne séparée avec gestion d'erreur
+        // Ajouter chaque livre comme une ligne séparée avec gestion d'erreur individuelle
         let validRows = 0;
-        books.forEach((book) => {
+        let errorCount = 0;
+        
+        books.forEach((book, index) => {
           try {
-            const row = this.createPopularListItem(book);
+            // Vérification de base des données du livre
+            if (!book || typeof book !== 'object') {
+              console.warn(`Invalid popular book object at index ${index}:`, book);
+              errorCount++;
+              return;
+            }
+            
+            const row = this.createPopularListItem(book, index + 1); // Ajouter 1 pour commencer à 1
             if (row) {
               tbody.appendChild(row);
               validRows++;
+            } else {
+              console.warn(`Failed to render popular row for book at index ${index}:`, book);
+              errorCount++;
             }
-          } catch (error) {
-            console.error('Error rendering popular list item for book:', book, error);
+          } catch (itemError) {
+            console.error(`Error rendering popular list item for book at index ${index}:`, book, itemError);
+            errorCount++;
+            
+            // Ajouter une ligne d'erreur pour ce livre spécifique
+           try {
+             const errorRow = document.createElement('tr');
+             errorRow.className = 'border-b';
+             errorRow.style.borderColor = 'var(--border-muted)';
+             errorRow.innerHTML = `
+               <td colspan="6" class="p-3 text-center text-sm opacity-70">
+                 Erreur d'affichage: ${itemError.message}
+               </td>
+             `;
+             tbody.appendChild(errorRow);
+           } catch (errorRowError) {
+             console.error('Failed to create popular error row:', errorRowError);
+           }
           }
         });
         
-        // Si aucune ligne valide n'a été créée, masquer le conteneur
+        console.log(`renderPopularList completed: ${validRows} valid rows, ${errorCount} errors`);
+        
+        // Si aucune ligne valide n'a été créée, afficher un message approprié
         if (validRows === 0) {
-          container.style.display = 'none';
-          container.classList.add('empty-container');
-          if (noBooks) {
-            noBooks.classList.remove('hidden');
-            noBooks.style.display = '';
-          }
+          console.warn('No valid popular rows were created');
+          container.innerHTML = `
+            <div class="text-center p-4">
+              <p class="text-red-500 mb-2">Aucun livre populaire ne peut être affiché</p>
+              <p class="text-sm opacity-70">Vérifiez les données et réessayez</p>
+              <button onclick="homeSections.renderPopularResults(window.lastPopularResults)" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
+                Réessayer
+              </button>
+            </div>
+          `;
         } else {
           container.classList.remove('empty-container');
+          
+          // S'il y a eu des erreurs mais que des lignes valides existent, afficher un avertissement
+          if (errorCount > 0) {
+            const warningRow = document.createElement('tr');
+            warningRow.innerHTML = `
+              <td colspan="5" class="p-2 text-center text-xs opacity-70" style="background: var(--bg-soft);">
+                ⚠️ ${errorCount} livre(s) populaire(s) n'ont pas pu être affichés correctement
+              </td>
+            `;
+            tbody.insertBefore(warningRow, tbody.firstChild);
+          }
         }
       } catch (error) {
-        console.error('Error in renderPopularList:', error);
-        // En cas d'erreur, masquer le conteneur et afficher le message d'erreur
-        const container = document.getElementById('popular-books-container');
-        const noBooks = document.getElementById('no-popular-books');
+        criticalError = true;
+        errorMessage = error.message;
+        console.error('Critical error in renderPopularList:', error);
+        console.error('Error stack:', error.stack);
         
+        // En cas d'erreur critique, afficher un message détaillé mais ne masquer le conteneur qu'en dernier recours
+        const container = document.getElementById('popular-books-container');
         if (container) {
-          container.style.display = 'none';
-          container.classList.add('empty-container');
+          container.innerHTML = `
+            <div class="text-center p-4">
+              <p class="text-red-500 mb-2">Erreur critique lors de l'affichage des livres populaires en liste</p>
+              <p class="text-sm opacity-70">${errorMessage}</p>
+              <button onclick="homeSections.renderPopularResults(window.lastPopularResults)" class="mt-2 px-3 py-1 rounded border text-xs" style="border-color: var(--border-muted);">
+                Réessayer
+              </button>
+            </div>
+          `;
         }
-        if (noBooks) {
-          noBooks.classList.remove('hidden');
-          noBooks.style.display = '';
-        }
+      }
+      
+      // Journalisation pour le débogage
+      if (criticalError) {
+        console.error('renderPopularList failed with critical error:', errorMessage);
+      } else {
+        console.log('renderPopularList completed successfully');
       }
     },
     
-    createPopularListItem(book) {
+    createPopularListItem(book, rank) {
       const isAppleBook = book.isAppleBook || false;
       
-      // Fonctions utilitaires pour nettoyer les données
+      // Fonction pour nettoyer les données de l'auteur (identique à renderListItem)
       const cleanAuthor = (author) => {
         if (!author) return 'Unknown author';
-        return author.length > 30 ? author.substring(0, 30) + '...' : author;
+        
+        // Essayer d'extraire le nom complet (nom + prénom) avant les séparateurs
+        const patterns = [
+          /^(.+?)\s*\[/,  // Avant le premier crochet
+          /^(.+?)\s*;/,   // Avant le premier point-virgule
+          /^(.+?)\s*-\s/, // Avant le premier tiret avec espaces
+          /^(.+?)\s*\(/,  // Avant la première parenthèse
+        ];
+        
+        for (const pattern of patterns) {
+          const match = author.match(pattern);
+          if (match && match[1]) {
+            let cleaned = match[1].trim();
+            
+            // Si le nom contient des virgules, essayer de prendre les deux premières parties (nom, prénom)
+            if (cleaned.includes(',')) {
+              const parts = cleaned.split(',').map(p => p.trim());
+              if (parts.length >= 2) {
+                // Inverser pour avoir "Prénom Nom" au lieu de "Nom, Prénom"
+                cleaned = parts[1] + ' ' + parts[0];
+              } else {
+                cleaned = parts[0];
+              }
+            }
+            
+            // Limiter à un nom raisonnable (max 30 caractères)
+            if (cleaned.length > 30) {
+              const words = cleaned.split(/\s+/);
+              if (words.length >= 2) {
+                // Prendre les deux premiers mots (généralement prénom + nom)
+                cleaned = words.slice(0, 2).join(' ');
+              } else {
+                cleaned = cleaned.substring(0, 30);
+              }
+            }
+            
+            // Vérifier si c'est un nom propre (contient au moins une majuscule)
+            if (/[A-Z]/.test(cleaned) && cleaned.length > 1) {
+              return cleaned;
+            }
+          }
+        }
+        
+        // Si aucun pattern ne correspond, essayer de trouver les deux premiers mots avec majuscules
+        const words = author.split(/\s+/);
+        const capitalizedWords = words.filter(word => /[A-Z]/.test(word) && word.length > 1);
+        
+        if (capitalizedWords.length >= 2) {
+          return capitalizedWords.slice(0, 2).join(' ');
+        } else if (capitalizedWords.length === 1) {
+          return capitalizedWords[0];
+        }
+        
+        // En dernier recours, retourner les deux premiers mots
+        if (words.length >= 2) {
+          return words.slice(0, 2).join(' ');
+        } else {
+          return words[0] || 'Unknown author';
+        }
       };
       
+      // Fonction pour nettoyer les dates (prendre seulement la première année)
       const cleanYear = (year) => {
         if (!year) return '';
+        
+        // Si l'année contient plusieurs années concaténées, prendre la première
         const yearMatch = year.match(/(\d{4})/);
-        return yearMatch ? yearMatch[1] : '';
+        if (yearMatch) {
+          return yearMatch[1];
+        }
+        
+        return '';
       };
+      
+      // Cellule Classement
+      const rankCell = document.createElement('td');
+      rankCell.className = 'p-3 font-medium text-center';
+      rankCell.textContent = rank || '-';
       
       // Cellule Preview
       const previewCell = document.createElement('td');
       previewCell.className = 'p-3';
       
-      if (book.preview) {
+      // Vérifier si on est sur mobile (désactiver le zoom sur mobile)
+      const isMobile = window.innerWidth <= 768;
+      
+      if (book.preview && !isMobile) {
+        const coverContainer = document.createElement('div');
+        coverContainer.className = 'cover-zoom-container';
+        
+        const coverImg = document.createElement('img');
+        coverImg.src = utils.e(book.preview);
+        coverImg.alt = 'Cover';
+        coverImg.className = 'book-cover w-12 h-16 object-cover rounded cursor-pointer';
+        coverImg.setAttribute('data-book-id', utils.e(book.id));
+        coverImg.setAttribute('data-src', utils.e(book.preview));
+        
+        // Ajouter le gestionnaire d'événements pour le zoom animé
+        coverImg.addEventListener('click', (e) => {
+          e.stopPropagation();
+          coverZoomManager.showZoomedImage(coverImg);
+        });
+        
+        coverContainer.appendChild(coverImg);
+        previewCell.appendChild(coverContainer);
+      } else if (book.preview && isMobile) {
+        // Sur mobile, juste l'image sans zoom
         const coverImg = document.createElement('img');
         coverImg.src = utils.e(book.preview);
         coverImg.alt = 'Cover';
         coverImg.className = 'w-12 h-16 object-cover rounded';
         previewCell.appendChild(coverImg);
       } else {
+        // Pas d'image disponible
         const noCover = document.createElement('div');
         noCover.className = 'w-12 h-16 rounded flex items-center justify-center opacity-70 text-xs';
         noCover.style.background = 'var(--bg-soft)';
@@ -4039,37 +4587,17 @@
       titleCell.className = 'p-3 font-medium';
       titleCell.textContent = utils.e(book.title) || 'Untitled';
       
-      // Cellule Author
+      // Cellule Author (nettoyée)
       const authorCell = document.createElement('td');
       authorCell.className = 'p-3';
       authorCell.textContent = cleanAuthor(book.author);
-      
-      // Cellule Publisher
-      const publisherCell = document.createElement('td');
-      publisherCell.className = 'p-3';
-      publisherCell.textContent = utils.e(book.publisher) || '-';
       
       // Cellule Year
       const yearCell = document.createElement('td');
       yearCell.className = 'p-3';
       yearCell.textContent = cleanYear(book.year || book.releaseDate) || '-';
       
-      // Cellule Language
-      const languageCell = document.createElement('td');
-      languageCell.className = 'p-3';
-      languageCell.textContent = utils.e(book.language) || '-';
-      
-      // Cellule Format
-      const formatCell = document.createElement('td');
-      formatCell.className = 'p-3';
-      formatCell.textContent = utils.e(book.format) || '-';
-      
-      // Cellule Size
-      const sizeCell = document.createElement('td');
-      sizeCell.className = 'p-3';
-      sizeCell.textContent = utils.e(book.size) || '-';
-      
-      // Cellule Actions
+      // Cellule Actions (verticale)
       const actionsCell = document.createElement('td');
       actionsCell.className = 'p-3';
       const actionsContainer = document.createElement('div');
@@ -4103,14 +4631,11 @@
         row.classList.add('apple-book-card');
       }
       
+      row.appendChild(rankCell);
       row.appendChild(previewCell);
       row.appendChild(titleCell);
       row.appendChild(authorCell);
-      row.appendChild(publisherCell);
       row.appendChild(yearCell);
-      row.appendChild(languageCell);
-      row.appendChild(formatCell);
-      row.appendChild(sizeCell);
       row.appendChild(actionsCell);
       
       return row;
@@ -4189,13 +4714,33 @@
     },
     
     init() {
+      console.log('=== HOME SECTIONS INIT CALLED ===');
+      
       // Bind refresh buttons
       el.refreshRecentBtn?.addEventListener('click', () => this.fetchRecentDownloads());
       el.refreshPopularBtn?.addEventListener('click', () => this.fetchPopularBooks());
       
       // Bind view toggle buttons for popular books
-      el.popularViewGridBtn?.addEventListener('click', () => this.setPopularView(VIEW_MODES.GRID));
-      el.popularViewListBtn?.addEventListener('click', () => this.setPopularView(VIEW_MODES.LIST));
+      console.log('Binding initial popular view buttons...');
+      console.log('el.popularViewGridBtn:', !!el.popularViewGridBtn);
+      console.log('el.popularViewListBtn:', !!el.popularViewListBtn);
+      
+      if (el.popularViewGridBtn) {
+        el.popularViewGridBtn.addEventListener('click', () => {
+          console.log('Initial popular grid button clicked');
+          this.setPopularView(VIEW_MODES.GRID);
+        });
+      }
+      
+      if (el.popularViewListBtn) {
+        el.popularViewListBtn.addEventListener('click', () => {
+          console.log('Initial popular list button clicked');
+          this.setPopularView(VIEW_MODES.LIST);
+        });
+      }
+      
+      // Initialize view toggle buttons for popular books
+      this.initPopularViewToggle();
       
       // Charger les données initiales
       this.fetchRecentDownloads();
@@ -4204,37 +4749,177 @@
     
     initPopularViewToggle() {
       // Initialize view toggle buttons for popular books
+      console.log('=== INIT POPULAR VIEW TOGGLE ===');
+      
       const viewGridBtn = document.getElementById('popular-view-grid');
       const viewListBtn = document.getElementById('popular-view-list');
       
+      console.log('viewGridBtn found:', !!viewGridBtn, 'id:', viewGridBtn?.id);
+      console.log('viewListBtn found:', !!viewListBtn, 'id:', viewListBtn?.id);
+      
       if (viewGridBtn) {
-        viewGridBtn.addEventListener('click', () => {
-          console.log('Grid view button clicked');
-          this.setPopularView('grid');
+        viewGridBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('=== GRID VIEW BUTTON CLICKED (INIT) ===');
+          this.setPopularView(VIEW_MODES.GRID);
         });
       }
       
       if (viewListBtn) {
-        viewListBtn.addEventListener('click', () => {
-          console.log('List view button clicked');
-          this.setPopularView('list');
+        viewListBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('=== LIST VIEW BUTTON CLICKED (INIT) ===');
+          this.setPopularView(VIEW_MODES.LIST);
         });
       }
+      
+      // S'assurer que les boutons ont les bons attributs
+      if (viewGridBtn) {
+        viewGridBtn.setAttribute('data-view', VIEW_MODES.GRID);
+      }
+      if (viewListBtn) {
+        viewListBtn.setAttribute('data-view', VIEW_MODES.LIST);
+      }
+      
+      console.log('Popular view toggle initialized successfully');
+    },
+    
+    reinitPopularViewButtons() {
+      // Réinitialiser les boutons de vue pour les livres populaires après le chargement dynamique
+      console.log('=== REINITIALIZING POPULAR VIEW BUTTONS ===');
+      console.log('el.popularViewGridBtn:', !!el.popularViewGridBtn);
+      console.log('el.popularViewListBtn:', !!el.popularViewListBtn);
+      
+      // Récupérer les boutons de vue populaires
+      const viewGridBtn = el.popularViewGridBtn || document.getElementById('popular-view-grid');
+      const viewListBtn = el.popularViewListBtn || document.getElementById('popular-view-list');
+      
+      console.log('viewGridBtn found:', !!viewGridBtn, 'id:', viewGridBtn?.id);
+      console.log('viewListBtn found:', !!viewListBtn, 'id:', viewListBtn?.id);
+      
+      if (!viewGridBtn || !viewListBtn) {
+        console.warn('Popular view buttons not found for reinitialization');
+        console.warn('Available buttons with view-toggle class:', document.querySelectorAll('.view-toggle'));
+        return;
+      }
+      
+      // Supprimer tous les gestionnaires d'événements existants en remplaçant les boutons
+      const newGridBtn = viewGridBtn.cloneNode(true);
+      const newListBtn = viewListBtn.cloneNode(true);
+      
+      // Remplacer les anciens boutons par les nouveaux
+      if (viewGridBtn.parentNode) {
+        viewGridBtn.parentNode.replaceChild(newGridBtn, viewGridBtn);
+      }
+      if (viewListBtn.parentNode) {
+        viewListBtn.parentNode.replaceChild(newListBtn, viewListBtn);
+      }
+      
+      // Mettre à jour les références dans l'objet el
+      el.popularViewGridBtn = newGridBtn;
+      el.popularViewListBtn = newListBtn;
+      
+      // Forcer la mise à jour de la référence du conteneur
+      el.popularViewToggleContainer = document.getElementById('popular-view-toggle-container');
+      
+      // Ajouter les nouveaux gestionnaires d'événements avec une vérification explicite
+      const gridClickHandler = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('=== POPULAR GRID VIEW BUTTON CLICKED ===');
+        this.setPopularView(VIEW_MODES.GRID);
+      };
+      
+      const listClickHandler = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('=== POPULAR LIST VIEW BUTTON CLICKED ===');
+        this.setPopularView(VIEW_MODES.LIST);
+      };
+      
+      newGridBtn.addEventListener('click', gridClickHandler);
+      newListBtn.addEventListener('click', listClickHandler);
+      
+      // S'assurer que les boutons ont les bons attributs
+      newGridBtn.setAttribute('data-view', VIEW_MODES.GRID);
+      newListBtn.setAttribute('data-view', VIEW_MODES.LIST);
+      
+      console.log('Event listeners attached to buttons');
+      console.log('Grid button data-view:', newGridBtn.getAttribute('data-view'));
+      console.log('List button data-view:', newListBtn.getAttribute('data-view'));
+      
+      // Mettre à jour l'état visuel des boutons avec un petit délai pour s'assurer que le DOM est prêt
+      setTimeout(() => {
+        console.log('Updating initial view state...');
+        this.setPopularView(this.getPopularViewMode());
+      }, 50);
+      
+      console.log('Popular view buttons reinitialized successfully');
     },
 
     setPopularView(viewMode) {
-      // Mettre à jour les boutons
-      document.querySelectorAll('#popular-view-toggle-container .view-toggle').forEach(btn => {
-        if (btn.getAttribute('data-view') === viewMode) {
-          btn.classList.add('active');
-        } else {
-          btn.classList.remove('active');
+      console.log('=== SET POPULAR VIEW CALLED ===');
+      console.log('viewMode:', viewMode);
+      console.log('window.lastPopularResults:', window.lastPopularResults ? `${window.lastPopularResults.length} items` : 'null/undefined');
+      
+      // Valider le mode de vue
+      if (viewMode !== VIEW_MODES.GRID && viewMode !== VIEW_MODES.LIST) {
+        console.error('Invalid view mode:', viewMode, 'Defaulting to GRID');
+        viewMode = VIEW_MODES.GRID;
+      }
+      
+      // Mettre à jour les boutons avec une référence dynamique
+      const container = el.popularViewToggleContainer || document.getElementById('popular-view-toggle-container');
+      console.log('container found:', !!container, 'id:', container?.id);
+      
+      if (container) {
+        const allButtons = container.querySelectorAll('.view-toggle');
+        console.log('Found buttons:', allButtons.length);
+        
+        let activeButtonFound = false;
+        container.querySelectorAll('.view-toggle').forEach(btn => {
+          const btnView = btn.getAttribute('data-view');
+          console.log('Button:', btn.id, 'data-view:', btnView, 'current viewMode:', viewMode);
+          
+          if (btn.getAttribute('data-view') === viewMode) {
+            btn.classList.add('active');
+            activeButtonFound = true;
+            console.log('Added active class to:', btn.id);
+          } else {
+            btn.classList.remove('active');
+            console.log('Removed active class from:', btn.id);
+          }
+        });
+        
+        if (!activeButtonFound) {
+          console.warn('No active button found for view mode:', viewMode);
         }
-      });
+      } else {
+        console.error('Popular view toggle container not found!');
+      }
+      
+      // Mettre à jour le conteneur de livres populaires avec les classes appropriées
+      const popularContainer = document.getElementById('popular-books-container');
+      if (popularContainer) {
+        console.log('Updating popular container classes');
+        popularContainer.classList.remove('grid-view', 'list-view');
+        popularContainer.classList.add(`${viewMode}-view`);
+        console.log('Added class:', `${viewMode}-view`);
+      } else {
+        console.error('Popular books container not found!');
+      }
       
       // Re-render les résultats avec la nouvelle vue
       const currentData = window.lastPopularResults || [];
-      this.renderPopularResults(currentData);
+      console.log('Calling renderPopularResults with data:', currentData.length, 'items');
+      
+      if (currentData.length > 0) {
+        this.renderPopularResults(currentData);
+      } else {
+        console.log('No popular books data to render');
+      }
     },
     
     clearPopularBooksCache() {

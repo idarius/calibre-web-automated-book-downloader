@@ -25,7 +25,6 @@
     
     /* Material Design sidebar variables */
     --sidebar-width: 280px;
-    --sidebar-collapsed-width: 72px;
     --sidebar-bg: #ffffff;
     --sidebar-text: #333333;
     --sidebar-text-secondary: #666666;
@@ -118,28 +117,7 @@ main {
 }
 
 /* Layout */
-header {
-    background: var(--header-bg);
-    color: var(--header-text);
-    padding: 1rem;
-    text-align: center;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    contain: layout style paint;
-    transform: translateZ(0);
-    height: 64px; /* Hauteur fixe pour l'alignement avec le sidebar */
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-/* Sticky header with optimized shadow effect */
-header {
-    position: sticky;
-    top: 0;
-    z-index: var(--z-navigation); /* Standardized z-index */
-    /* Remove all transitions to prevent conflicts with sticky positioning */
-}
+/* Header styles are now handled by Tailwind classes in HTML */
 
 /* Create shadow effect using pseudo-element that appears on scroll */
 header::before {
@@ -232,6 +210,17 @@ header a:hover h1 {
     transition: color 0.2s ease;
 }
 
+/* Hover effects for header logo */
+header a:hover .header-title {
+    color: #60a5fa; /* Default blue hover color */
+    transition: color 0.2s ease;
+}
+
+header a:hover .header-logo {
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
 /* Enhanced hover effects for header links */
 header a {
     text-decoration: none;
@@ -244,10 +233,15 @@ header a:focus {
     border-radius: 4px;
 }
 
-/* Supprimer complètement le cadre bleu au clic sur le logo */
+/* Améliorer le focus outline pour le logo tout en gardant un design épuré */
+header a:focus-visible {
+    outline: 2px solid var(--primary-color) !important;
+    outline-offset: 2px !important;
+    border-radius: 4px !important;
+}
+
+/* Garder les styles de base pour les autres états */
 header a:active,
-header a:focus,
-header a:focus-visible,
 header a:visited {
     outline: none !important;
     border: none !important;
@@ -255,13 +249,24 @@ header a:visited {
 }
 
 header a:active h1,
-header a:focus h1,
 header a:visited h1 {
     color: inherit !important;
 }
 
-/* Supprimer le focus outline pour tous les états */
-header a::-moz-focus-inner {
+/* Améliorer le focus outline pour tous les éléments interactifs */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--primary-color) !important;
+    outline-offset: 2px !important;
+    border-radius: 4px !important;
+}
+
+/* S'assurer que les styles focus ne sont pas supprimés */
+button::-moz-focus-inner,
+a::-moz-focus-inner {
     border: 0;
 }
 
@@ -277,6 +282,12 @@ header a::-moz-focus-inner {
     header img {
         min-height: 32px;
         min-width: 32px;
+    }
+    
+    /* Améliorer les cibles tactiles pour les boutons */
+    button, .sidebar-link {
+        min-height: 44px;
+        min-width: 44px;
     }
 }
 
@@ -416,14 +427,6 @@ header:not(:hover)::before {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
-}
-
-footer {
-    text-align: center;
-    padding: 1rem;
-    background: var(--header-bg);
-    color: var(--header-text);
-    margin-top: auto;
 }
 
 /* Search Section */
@@ -993,19 +996,19 @@ h1, h2, h3, h4, h5, h6,
 }
 
 /* Theme-specific hover color overrides */
-[data-theme="dark-blue"] header a:hover h1 {
+[data-theme="dark-blue"] header a:hover h1,
+[data-theme="dark-blue"] header a:hover .header-title {
     color: #93c5fd !important;
 }
 
-[data-theme="light"] header a:hover h1 {
+[data-theme="light"] header a:hover h1,
+[data-theme="light"] header a:hover .header-title {
     color: #2563eb !important;
 }
 
-[data-theme="dark-blue"] footer {
-    background: var(--header-bg) !important;
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+[data-theme="dark"] header a:hover h1,
+[data-theme="dark"] header a:hover .header-title {
+    color: #4dabf7 !important;
 }
 
 /* Sidebar Panel Styles */
@@ -1095,6 +1098,20 @@ h1, h2, h3, h4, h5, h6,
 #sidebar-overlay.sidebar-overlay-active {
     will-change: opacity; /* Only when visible */
     transition: opacity 0.3s ease-in-out;
+}
+
+/* Ajuster la hauteur du panel pour qu'il commence sous la topbar */
+#sidebar-panel {
+    top: 64px; /* Positionné sous la topbar */
+    height: calc(100vh - 64px); /* Hauteur adaptée à l'espace restant */
+}
+
+/* Mobile adjustments for sidebar panel */
+@media (max-width: 768px) {
+    #sidebar-panel {
+        top: 64px; /* Conserver le positionnement sous la topbar sur mobile */
+        height: calc(100vh - 64px); /* Hauteur adaptée sur mobile */
+    }
 }
 
 /* Custom scrollbar for sidebar content */
@@ -1227,7 +1244,8 @@ button:disabled {
 }
 
 /* Table styles for list view */
-#results-container.list-view table {
+#results-container.list-view table,
+#popular-books-container.list-view table {
     width: 100%;
     border-collapse: collapse;
     background: var(--bg-soft);
@@ -1235,7 +1253,8 @@ button:disabled {
     overflow: hidden;
 }
 
-#results-container.list-view th {
+#results-container.list-view th,
+#popular-books-container.list-view th {
     background: var(--bg-soft);
     font-weight: 600;
     text-align: left;
@@ -1244,19 +1263,23 @@ button:disabled {
     z-index: 10;
 }
 
-#results-container.list-view td {
+#results-container.list-view td,
+#popular-books-container.list-view td {
     vertical-align: middle;
 }
 
-#results-container.list-view tr:hover {
+#results-container.list-view tr:hover,
+#popular-books-container.list-view tr:hover {
     background: rgba(0, 0, 0, 0.05);
 }
 
-[data-theme="dark"] #results-container.list-view tr:hover {
+[data-theme="dark"] #results-container.list-view tr:hover,
+[data-theme="dark"] #popular-books-container.list-view tr:hover {
     background: rgba(255, 255, 255, 0.05);
 }
 
-[data-theme="dark-blue"] #results-container.list-view tr:hover {
+[data-theme="dark-blue"] #results-container.list-view tr:hover,
+[data-theme="dark-blue"] #popular-books-container.list-view tr:hover {
     background: rgba(255, 255, 255, 0.05);
 }
 
@@ -1557,60 +1580,82 @@ button:disabled {
     position: relative;
 }
 
-/* Sidebar Navigation */
-.sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: var(--sidebar-width);
-    height: 100vh;
-    background: var(--sidebar-bg);
-    border-right: 1px solid var(--sidebar-border);
-    box-shadow: var(--sidebar-elevation);
-    z-index: var(--z-sidebar);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-.sidebar.collapsed {
-    width: var(--sidebar-collapsed-width);
-}
-
-/* Sidebar Header */
-.sidebar-header {
-    padding: 16px;
-    border-bottom: 1px solid var(--sidebar-border);
+/* Header Logo Container - aligné à gauche comme la sidebar */
+.header-logo-container {
+    position: absolute;
+    left: 8px; /* Aligné à gauche avec le même margin que les sidebar-items */
     display: flex;
     align-items: center;
-    gap: 12px;
-    height: 64px; /* Hauteur fixe pour correspondre exactement au header principal */
-    box-sizing: border-box;
+    transition: left 0.3s ease;
+    z-index: 10;
+    padding: 2px 0; /* Ajout du même margin vertical que les sidebar-items */
 }
 
-.sidebar-logo {
-    width: 32px;
-    height: 32px;
+.header-logo {
+    width: 24px; /* Même taille que les sidebar-icons */
+    height: 24px; /* Même taille que les sidebar-icons */
     flex-shrink: 0;
 }
 
-.sidebar-title {
-    font-size: 20px;
-    font-weight: 500;
-    color: var(--sidebar-text);
+.header-title {
+    font-size: 18px; /* Augmenté de 14px à 18px pour une meilleure visibilité */
+    font-weight: 500; /* Légèrement plus gras pour mieux ressortir */
+    color: var(--header-text);
     white-space: nowrap;
-    opacity: 1;
-    transition: opacity 0.3s ease;
+    transition: color 0.2s ease;
+    margin: 0;
 }
 
-.sidebar.collapsed .sidebar-title {
-    opacity: 0;
-    pointer-events: none;
+/* S'assurer que le lien du logo est bien cliquable */
+.header-logo-container a {
+    display: flex;
+    align-items: center;
+    gap: 16px; /* Même espacement que les sidebar-links */
+    padding: 12px 16px; /* Même padding que les sidebar-links */
+    text-decoration: none;
+    color: inherit;
+    border-radius: 8px; /* Même border-radius que les sidebar-links */
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+/* Effet hover pour le logo */
+.header-logo-container a:hover {
+    background-color: rgba(0, 0, 0, 0.04); /* Même hover-bg que la sidebar */
+}
+
+/* Effet hover spécifique pour les thèmes */
+[data-theme="dark"] .header-logo-container a:hover {
+    background-color: rgba(255, 255, 255, 0.08); /* Même hover-bg que la sidebar en dark */
+}
+
+[data-theme="dark-blue"] .header-logo-container a:hover {
+    background-color: rgba(255, 255, 255, 0.08); /* Même hover-bg que la sidebar en dark-blue */
+}
+
+/* Sidebar Navigation */
+.sidebar {
+    position: fixed;
+    top: 64px; /* Positionné sous la topbar */
+    left: 0;
+    width: var(--sidebar-width);
+    height: calc(100vh - 64px); /* Hauteur adaptée à l'espace restant */
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border-muted);
+    box-shadow: var(--sidebar-elevation);
+    z-index: var(--z-sidebar);
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    padding-top: 0; /* Supprimer le padding supérieur car le header a été supprimé */
 }
 
 /* Sidebar Navigation */
 .sidebar-nav {
     padding: 8px 0;
+    flex: 1;
 }
 
 .sidebar-item {
@@ -1699,11 +1744,6 @@ button:disabled {
     transition: opacity 0.3s ease;
 }
 
-.sidebar.collapsed .sidebar-text {
-    opacity: 0;
-    pointer-events: none;
-}
-
 /* Tooltip for collapsed sidebar */
 .sidebar-item {
     position: relative;
@@ -1736,55 +1776,48 @@ button:disabled {
     border-right-color: #333;
 }
 
-.sidebar.collapsed .sidebar-item:hover .sidebar-tooltip {
-    opacity: 1;
+/* Sidebar Footer */
+.sidebar-footer {
+    margin-top: auto;
+    padding: 16px;
+    border-top: 1px solid var(--border-muted);
 }
 
-/* Toggle Button */
-.sidebar-toggle {
-    position: absolute;
-    right: -16px;
-    top: 24px;
-    width: 32px;
-    height: 32px;
-    background: var(--sidebar-bg);
-    border: 1px solid var(--sidebar-border);
-    border-radius: 50%;
+.sidebar-footer-content {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: var(--sidebar-shadow);
-    transition: all 0.2s ease;
-    z-index: 1;
+    flex-direction: column;
+    gap: 12px;
 }
 
-.sidebar-toggle:hover {
-    background: var(--sidebar-hover-bg);
-    transform: scale(1.05);
+.sidebar-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
-.sidebar-toggle svg {
-    width: 16px;
-    height: 16px;
-    color: var(--sidebar-text);
-    transition: transform 0.3s ease;
+.sidebar-version, .sidebar-env {
+    font-size: 12px;
+    color: var(--sidebar-text-secondary);
+    margin: 0;
 }
 
-.sidebar.collapsed .sidebar-toggle svg {
-    transform: rotate(180deg);
+.sidebar-github-link {
+    align-self: flex-start;
+    color: var(--sidebar-text-secondary);
+    transition: color 0.2s ease;
+}
+
+.sidebar-github-link:hover {
+    color: var(--sidebar-active-text);
 }
 
 /* Main Content Area */
 .main-content {
     margin-left: var(--sidebar-width);
     flex: 1;
-    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    min-height: 100vh;
-}
-
-.sidebar.collapsed + .main-content {
-    margin-left: var(--sidebar-collapsed-width);
+    min-height: calc(100vh - 64px); /* Hauteur adaptée à l'espace restant */
+    display: flex;
+    flex-direction: column;
 }
 
 /* Dark Theme Sidebar */
@@ -1798,11 +1831,6 @@ button:disabled {
     --sidebar-active-text: #4dabf7;
 }
 
-[data-theme="dark"] .sidebar-toggle {
-    background: #1e1e1e;
-    border-color: #404040;
-}
-
 /* Dark Blue Theme Sidebar */
 [data-theme="dark-blue"] .sidebar {
     --sidebar-bg: rgba(13, 27, 42, 0.95);
@@ -1814,42 +1842,31 @@ button:disabled {
     --sidebar-active-text: #4dabf7;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    border-right: 1px solid rgba(255, 255, 255, 0.1); /* Bordure unifiée avec la topbar */
 }
 
-[data-theme="dark-blue"] .sidebar-toggle {
-    background: rgba(13, 27, 42, 0.95);
-    border-color: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+/* Uniformiser les bordures pour le thème dark blue */
+[data-theme="dark-blue"] header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* Bordure unifiée avec le sidebar */
 }
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
     .sidebar {
-        width: var(--sidebar-collapsed-width);
+        width: var(--sidebar-width);
         transform: translateX(-100%);
+        top: 64px; /* Conserver le positionnement sous la topbar sur mobile */
+        height: calc(100vh - 64px); /* Hauteur adaptée sur mobile */
     }
     
     .sidebar.mobile-open {
         transform: translateX(0);
-        width: var(--sidebar-width);
-    }
-    
-    .sidebar.collapsed {
-        transform: translateX(-100%);
-    }
-    
-    .sidebar.collapsed.mobile-open {
-        transform: translateX(0);
-        width: var(--sidebar-width);
     }
     
     .main-content {
         margin-left: 0;
-    }
-    
-    .sidebar-toggle {
-        display: none;
+        min-height: calc(100vh - 64px); /* Hauteur adaptée sur mobile */
+        height: auto; /* Permettre au contenu de déterminer la hauteur */
     }
     
     /* Mobile Menu Button */
@@ -1865,16 +1882,27 @@ button:disabled {
         color: var(--header-text);
     }
     
-    .sidebar.mobile-open .sidebar-title {
-        opacity: 1;
+    /* Ajuster le logo pour mobile */
+    .header-logo-container {
+        position: relative; /* Garder le positionnement mais ajusté pour mobile */
+        left: 0;
+        margin-left: 8px; /* Aligné avec les sidebar-items sur mobile */
+        padding: 2px 0; /* Conserver le même padding vertical */
     }
     
-    .sidebar.mobile-open .sidebar-text {
-        opacity: 1;
+    .header-logo-container a {
+        padding: 12px 16px; /* Conserver le même padding que les sidebar-links */
     }
     
-    .sidebar.mobile-open .sidebar-tooltip {
-        display: none;
+    .header-title {
+        font-size: 16px; /* Légèrement plus petit que sur desktop mais plus grand que 14px */
+    }
+}
+
+/* Tablet Responsive */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .header-logo-container {
+        left: 8px; /* Aligné à gauche comme la sidebar sur tablettes */
     }
 }
 
@@ -1887,10 +1915,10 @@ button:disabled {
 /* Overlay for mobile */
 .mobile-overlay {
     position: fixed;
-    top: 0;
+    top: 64px; /* Commence sous la topbar */
     left: 0;
     width: 100%;
-    height: 100%;
+    height: calc(100% - 64px); /* S'adapte à l'espace restant */
     background: rgba(0, 0, 0, 0.5);
     z-index: var(--z-overlay);
     opacity: 0;
@@ -2107,4 +2135,322 @@ button:disabled {
 .empty-container:after {
     content: '' !important;
     display: none !important;
+}
+
+/* Supprimer la scrollbar quand elle n'est pas nécessaire */
+.page-content {
+    overflow-y: auto;
+    /* S'assurer que la hauteur s'adapte au contenu */
+    height: auto;
+    min-height: 0;
+}
+
+/* Pages spécifiques - ajustement pour éviter la scrollbar inutile */
+#home-page, #search-page, #popular-page, #admin-page {
+    height: auto;
+    min-height: 0;
+    overflow-y: visible;
+}
+
+/* Conteneur principal pour s'adapter au contenu */
+#page-content {
+    height: auto;
+    min-height: 0;
+    overflow-y: visible;
+}
+
+/* Conteneurs de résultats - n'afficher la scrollbar que si nécessaire */
+#results-container, #popular-books-container, #home-sections {
+    height: auto;
+    min-height: 0;
+    overflow-y: visible;
+}
+
+/* Sections de recherche */
+#search-section, #active-downloads-top {
+    height: auto;
+    min-height: 0;
+    overflow-y: visible;
+}
+
+/* S'assurer que le contenu peut déborder si nécessaire pour la scrollbar */
+#results-container.list-view, #popular-books-container.list-view {
+    overflow-y: auto;
+    max-height: none; /* Pas de hauteur maximale fixe */
+}
+
+/* Pour les vues grille, permettre au contenu de s'adapter */
+#results-container.grid-view, #popular-books-container.grid-view {
+    height: auto;
+    overflow-y: visible;
+}
+
+/* Cacher la scrollbar par défaut et l'afficher uniquement au survol/scroll */
+.page-content::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+}
+
+.page-content:hover::-webkit-scrollbar {
+    width: 8px;
+}
+
+.page-content::-webkit-scrollbar-track {
+    background: var(--bg-soft);
+}
+
+.page-content::-webkit-scrollbar-thumb {
+    background: var(--border-muted);
+    border-radius: 4px;
+}
+
+.page-content::-webkit-scrollbar-thumb:hover {
+    background: var(--sidebar-text-secondary);
+}
+
+/* Pour Firefox */
+.page-content {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-muted) var(--bg-soft);
+}
+
+/* Cacher la scrollbar par défaut dans Firefox */
+@media (hover: hover) {
+    .page-content {
+        scrollbar-width: none;
+    }
+    
+    .page-content:hover {
+        scrollbar-width: thin;
+    }
+}
+
+/* ===== ADMIN PAGE STYLES ===== */
+
+/* Admin Tabs Navigation */
+.admin-tab-button {
+    position: relative;
+    padding: 0.5rem 1rem;
+    margin-bottom: -1px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text);
+    font-weight: 500;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.admin-tab-button:hover {
+    color: var(--primary-color);
+    border-bottom-color: var(--border-muted);
+}
+
+.admin-tab-button.active,
+.admin-tab-button[style*="border-color: var(--primary-color)"] {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+/* Admin Tab Content */
+.admin-tab-content {
+    display: block;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.admin-tab-content.hidden {
+    display: none;
+}
+
+/* Admin Form Styles */
+.admin-tab-content .rounded-lg {
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.admin-tab-content h2 {
+    color: var(--heading-color);
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-muted);
+}
+
+/* Admin Form Inputs */
+.admin-tab-content input[type="text"],
+.admin-tab-content input[type="number"],
+.admin-tab-content input[type="password"],
+.admin-tab-content select {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-muted);
+    border-radius: 0.375rem;
+    background: var(--bg-soft);
+    color: var(--text);
+    font-size: 0.875rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.admin-tab-content input:focus,
+.admin-tab-content select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
+}
+
+.admin-tab-content input:disabled,
+.admin-tab-content input[readonly] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Admin Form Labels */
+.admin-tab-content label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+/* Admin Checkboxes */
+.admin-tab-content input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    margin-right: 0.5rem;
+    accent-color: var(--primary-color);
+}
+
+.admin-tab-content .flex.items-center {
+    margin-bottom: 0.5rem;
+}
+
+.admin-tab-content .text-xs {
+    color: var(--text);
+    opacity: 0.7;
+    margin-top: 0.25rem;
+    margin-left: 1.5rem;
+}
+
+/* Admin Buttons */
+.admin-tab-content button {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-muted);
+    border-radius: 0.375rem;
+    background: var(--bg-soft);
+    color: var(--text);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.admin-tab-content button:hover {
+    background: var(--table-hover-background);
+    border-color: var(--border-color);
+}
+
+.admin-tab-content button.bg-blue-600 {
+    background: var(--primary-color) !important;
+    color: white !important;
+    border-color: var(--primary-color) !important;
+}
+
+.admin-tab-content button.bg-blue-600:hover {
+    background: var(--primary-dark) !important;
+    border-color: var(--primary-dark) !important;
+}
+
+/* Admin Status Message */
+#admin-status {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    background: #10b981;
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: var(--z-dropdowns);
+    animation: slideInRight 0.3s ease-out;
+}
+
+#admin-status.hidden {
+    display: none;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Admin Grid Layout */
+.admin-tab-content .grid {
+    gap: 1.5rem;
+}
+
+.admin-tab-content .md\\:col-span-2 {
+    grid-column: span 1;
+}
+
+@media (min-width: 768px) {
+    .admin-tab-content .md\\:col-span-2 {
+        grid-column: span 2;
+    }
+}
+
+/* Theme-specific admin styles */
+[data-theme="dark"] .admin-tab-button:hover {
+    color: #4dabf7;
+    border-bottom-color: #404040;
+}
+
+[data-theme="dark"] .admin-tab-content input:focus,
+[data-theme="dark"] .admin-tab-content select:focus {
+    box-shadow: 0 0 0 3px rgba(77, 171, 247, 0.1);
+}
+
+[data-theme="dark-blue"] .admin-tab-button:hover {
+    color: #93c5fd;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark-blue"] .admin-tab-content input:focus,
+[data-theme="dark-blue"] .admin-tab-content select:focus {
+    box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.1);
+}
+
+/* Responsive admin styles */
+@media (max-width: 768px) {
+    .admin-tab-button {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
+    
+    .admin-tab-content .grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .admin-tab-content .md\\:col-span-2 {
+        grid-column: span 1;
+    }
+    
+    #admin-status {
+        bottom: 0.5rem;
+        right: 0.5rem;
+        left: 0.5rem;
+        text-align: center;
+    }
 }

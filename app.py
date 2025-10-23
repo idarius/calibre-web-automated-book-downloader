@@ -160,6 +160,30 @@ def popular() -> Union[Response, Tuple[Response, int]]:
 
  
 
+@app.route('/admin')
+@login_required
+def admin() -> Union[Response, Tuple[Response, int]]:
+    """
+    Return admin page fragment for SPA navigation.
+    """
+    try:
+        # Return the admin template as a fragment
+        admin_content = render_template('admin.html',
+                               book_languages=_SUPPORTED_BOOK_LANGUAGE,
+                               default_language=BOOK_LANGUAGE,
+                               supported_formats=SUPPORTED_FORMATS,
+                               debug=DEBUG,
+                               build_version=BUILD_VERSION,
+                               release_version=RELEASE_VERSION,
+                               app_env=APP_ENV
+                               )
+        return jsonify({"content": admin_content})
+    except Exception as e:
+        logger.error_trace(f"Admin fragment error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+ 
+
 @app.route('/favico<path:_>')
 @app.route('/request/favico<path:_>')
 @app.route('/request/static/favico<path:_>')

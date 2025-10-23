@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,26 +25,57 @@
         </ul>
     </div>
 
-    <!-- Mobile Overlay -->
-    <div id="mobile-overlay" class="mobile-overlay"></div>
+    <!-- Topbar - Full width -->
+    <header class="w-full border-b border-[color:var(--border-muted)] sticky top-0 z-[25]" style="background: var(--header-bg);" role="banner">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <!-- Mobile Menu Button -->
+                <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Toggle mobile menu">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+                
+                <!-- Logo et titre - centré par rapport à la sidebar -->
+                <div class="header-logo-container">
+                    <a href="/" class="flex items-center gap-3">
+                        <img src="{{ url_for('static', filename='media/logo.png') }}" alt="Logo" class="header-logo">
+                        <h1 class="header-title">Book Downloader</h1>
+                    </a>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                {% if debug %}
+                <form action="/request/api/restart" method="get" id="restart-form">
+                    <button class="px-3 py-1 rounded bg-red-600 text-white text-sm" id="restart-button" type="submit">
+                        RESTART
+                    </button>
+                </form>
+                <form action="/request/debug" method="get" id="debug-form">
+                    <button class="px-3 py-1 rounded bg-red-600/80 text-white text-sm" id="debug-button" type="submit">
+                        DEBUG
+                    </button>
+                </form>
+                {% endif %}
+
+                <!-- Theme Dropdown -->
+                <div class="relative">
+                    <button id="theme-toggle" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">
+                        <span id="theme-text">Theme</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
 
     <!-- Main Container with Sidebar -->
     <div class="main-container">
         <!-- Material Design Sidebar -->
-        <nav id="sidebar" class="sidebar">
-            <div class="sidebar-header">
-                <img src="{{ url_for('static', filename='media/logo.png') }}" alt="Logo" class="sidebar-logo">
-                <h1 class="sidebar-title">Book Downloader</h1>
-                <button id="sidebar-collapse-toggle" class="sidebar-toggle" aria-label="Toggle sidebar">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                    </svg>
-                </button>
-            </div>
+        <nav id="sidebar" class="sidebar" role="navigation">
             
             <div class="sidebar-nav">
                 <div class="sidebar-item active" data-page="home">
-                    <a href="/" class="sidebar-link">
+                    <a href="/#home" class="sidebar-link" aria-current="page">
                         <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                         </svg>
@@ -82,67 +113,47 @@
                         <div class="sidebar-tooltip">Téléchargements</div>
                     </a>
                 </div>
+                
+                <div class="sidebar-item" data-page="admin">
+                    <a href="/#admin" class="sidebar-link">
+                        <svg class="sidebar-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span class="sidebar-text">Administration</span>
+                        <div class="sidebar-tooltip">Administration</div>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Footer dans le sidebar -->
+            <div class="sidebar-footer">
+                <div class="sidebar-footer-content">
+                    <div class="sidebar-info">
+                        <p class="sidebar-version">Version: {{ release_version or '1.0.0' }}</p>
+                        <p class="sidebar-env">Env: {{ app_env or 'development' }}</p>
+                    </div>
+                    <a href="https://github.com/idarius/calibre-web-automated-book-downloader" class="sidebar-github-link" aria-label="GitHub">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-5 h-5">
+                            <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38
+                            0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52
+                            -.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95
+                            0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.54 7.54 0 012 0c1.53-1.03 2.2-.82 2.2-.82
+                            .44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2
+                            0 .21.15.46.55.38A8 8 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                        </svg>
+                    </a>
+                </div>
             </div>
         </nav>
 
         <!-- Main Content Area -->
         <main class="main-content">
-            <!-- Header -->
-            <header class="w-full border-b border-[color:var(--border-muted)] sticky top-0 z-[25]" style="background: var(--header-bg);" role="banner">
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <!-- Mobile Menu Button -->
-                        <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Toggle mobile menu">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                            </svg>
-                        </button>
-                        
-                        <a href="/" class="flex items-center gap-3 group hover:opacity-90 transition-opacity duration-200" aria-label="Retour à l'accueil">
-                            <img src="{{ url_for('static', filename='media/logo.png') }}" alt="Logo Book Search & Download" role="img" class="h-8 w-8">
-                            <h1 class="text-lg font-semibold group-hover:text-blue-400 transition-colors duration-200">Book Search & Download</h1>
-                        </a>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        {% if debug %}
-                        <form action="/request/api/restart" method="get" id="restart-form">
-                            <button class="px-3 py-1 rounded bg-red-600 text-white text-sm" id="restart-button" type="submit">
-                                RESTART
-                            </button>
-                        </form>
-                        <form action="/request/debug" method="get" id="debug-form">
-                            <button class="px-3 py-1 rounded bg-red-600/80 text-white text-sm" id="debug-button" type="submit">
-                                DEBUG
-                            </button>
-                        </form>
-                        {% endif %}
-
-                        <!-- Sidebar Toggle Button -->
-                        <div class="relative">
-                            <button id="sidebar-toggle" class="px-3 py-1 rounded border text-sm relative" style="border-color: var(--border-muted);">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                                </svg>
-                                <span id="sidebar-badge" class="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center hidden">0</span>
-                            </button>
-                        </div>
-
-                        <!-- Theme Dropdown -->
-                        <div class="relative">
-                            <button id="theme-toggle" class="px-3 py-1 rounded border text-sm" style="border-color: var(--border-muted);">
-                                <span id="theme-text">Theme</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
             <!-- Page Content -->
             <div id="page-content" class="page-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 <!-- Home Page Content (Minimalist) -->
                 <div id="home-page" class="page-content">
                     <div class="text-center py-16">
-                        <img src="{{ url_for('static', filename='media/logo.png') }}" alt="Book Downloader" class="w-24 h-24 mx-auto mb-8 opacity-80">
                         <h1 class="text-4xl font-light mb-4" style="color: var(--text);">Bienvenue sur Book Downloader</h1>
                         <p class="text-lg opacity-70 mb-8 max-w-2xl mx-auto" style="color: var(--text);">
                             Utilisez le menu de navigation pour accéder à la recherche, découvrir les livres populaires ou gérer vos téléchargements.
@@ -173,18 +184,23 @@
                 <div id="popular-page" class="page-content hidden">
                     <!-- Content will be loaded dynamically -->
                 </div>
+
+                <!-- Admin Page Content (Hidden by default) -->
+                <div id="admin-page" class="page-content hidden">
+                    <!-- Content will be loaded dynamically -->
+                </div>
             </div>
         </main>
     </div>
 
     <!-- Downloads Sidebar Panel -->
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-[40] hidden"></div>
-    <div id="sidebar-panel" class="fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-gray-800 shadow-xl z-[45] transform translate-x-full transition-transform duration-300 ease-in-out">
+    <aside id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-[40] hidden" role="complementary"></aside>
+    <aside id="sidebar-panel" class="fixed top-16 right-0 h-full w-full max-w-md bg-white dark:bg-gray-800 shadow-xl z-[45] transform translate-x-full transition-transform duration-300 ease-in-out" role="complementary" aria-hidden="true">
         <div class="h-full flex flex-col" style="background: var(--bg-soft);">
             <!-- Sidebar Header -->
             <div class="flex items-center justify-between p-4 border-b" style="border-color: var(--border-muted);">
                 <h2 class="text-lg font-semibold">Download Queue & Status</h2>
-                <button id="sidebar-close" class="p-1 rounded hover:bg-black/10">
+                <button id="sidebar-close" class="p-1 rounded hover:bg-black/10" aria-label="Fermer le panel des téléchargements">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -215,27 +231,6 @@
     <div class="modal-overlay z-[100]" id="modal-overlay" role="dialog" aria-modal="true">
         <div class="details-container" id="details-container"></div>
     </div>
-
-    <footer class="mt-10 border-t pt-6 pb-10" style="border-color: var(--border-muted); background: var(--footer-bg);">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-            <div>
-                <p class="text-sm opacity-80">Calibre Web Book Downloader</p>
-                <p class="text-xs opacity-60 mt-1">
-                    Build: {{ build_version }}  • Release: {{ release_version }}  • Env: {{ app_env }}
-                </p>
-            </div>
-            <a href="https://github.com/calibrain/calibre-web-automated-book-downloader" class="opacity-80 hover:opacity-100" aria-label="GitHub">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-6 h-6">
-                    <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38
-                    0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52
-                    -.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95
-                    0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.54 7.54 0 012 0c1.53-1.03 2.2-.82 2.2-.82
-                    .44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2
-                    0 .21.15.46.55.38A8 8 0 0016 8c0-4.42-3.58-8-8-8z"/>
-                </svg>
-            </a>
-        </div>
-    </footer>
 
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 </body>

@@ -1,0 +1,304 @@
+<!-- Admin Page Header -->
+<section class="mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h1 class="text-2xl font-bold mb-2">Administration</h1>
+            <p class="opacity-70">Configurez les paramètres de l'application</p>
+        </div>
+    </div>
+</section>
+
+<!-- Admin Tabs Navigation -->
+<section class="mb-6">
+    <div class="border-b" style="border-color: var(--border-muted);">
+        <nav class="flex space-x-8" aria-label="Tabs">
+            <button class="admin-tab-button py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200" data-tab="general" style="border-color: var(--primary-color); color: var(--primary-color);">
+                Général
+            </button>
+            <button class="admin-tab-button py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 border-transparent" data-tab="mqtt" style="color: var(--text);">
+                MQTT
+            </button>
+            <button class="admin-tab-button py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 border-transparent" data-tab="bypasser" style="color: var(--text);">
+                Bypasser
+            </button>
+        </nav>
+    </div>
+</section>
+
+<!-- Admin Tab Content -->
+<section class="mb-8">
+    <!-- General Tab -->
+    <div id="general-tab" class="admin-tab-content">
+        <div class="rounded-lg p-6" style="background: var(--bg-soft); border: 1px solid var(--border-muted);">
+            <h2 class="text-lg font-semibold mb-4">Paramètres généraux</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="app-name" class="block text-sm font-medium mb-2">Nom de l'application</label>
+                    <input type="text" id="app-name" value="Book Downloader" 
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="app-version" class="block text-sm font-medium mb-2">Version</label>
+                    <input type="text" id="app-version" value="1.0.0" readonly
+                           class="w-full px-3 py-2 rounded-md border opacity-60"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="server-port" class="block text-sm font-medium mb-2">Port du serveur</label>
+                    <input type="number" id="server-port" value="8080" 
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="max-downloads" class="block text-sm font-medium mb-2">Téléchargements simultanés max</label>
+                    <input type="number" id="max-downloads" value="3" min="1" max="10"
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="download-path" class="block text-sm font-medium mb-2">Répertoire de téléchargement</label>
+                    <input type="text" id="download-path" value="./downloads" 
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="language" class="block text-sm font-medium mb-2">Langue par défaut</label>
+                    <select id="language" class="w-full px-3 py-2 rounded-md border"
+                            style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                        <option value="fr" selected>Français</option>
+                        <option value="en">English</option>
+                        <option value="es">Español</option>
+                        <option value="de">Deutsch</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="debug-mode" class="mr-2">
+                        <label for="debug-mode" class="text-sm font-medium">Mode debug</label>
+                    </div>
+                    <p class="text-xs opacity-60 mt-1">Active les logs détaillés et les informations de débogage</p>
+                </div>
+                <div class="md:col-span-2">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="auto-update" class="mr-2" checked>
+                        <label for="auto-update" class="text-sm font-medium">Mises à jour automatiques</label>
+                    </div>
+                    <p class="text-xs opacity-60 mt-1">Vérifie automatiquement les mises à jour disponibles</p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end">
+                <button class="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                    Enregistrer les paramètres
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MQTT Tab -->
+    <div id="mqtt-tab" class="admin-tab-content hidden">
+        <div class="rounded-lg p-6" style="background: var(--bg-soft); border: 1px solid var(--border-muted);">
+            <h2 class="text-lg font-semibold mb-4">Configuration MQTT</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="mqtt-server" class="block text-sm font-medium mb-2">Serveur MQTT</label>
+                    <input type="text" id="mqtt-server" placeholder="mqtt.example.com" 
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="mqtt-port" class="block text-sm font-medium mb-2">Port MQTT</label>
+                    <input type="number" id="mqtt-port" value="1883" 
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="mqtt-username" class="block text-sm font-medium mb-2">Identifiant</label>
+                    <input type="text" id="mqtt-username" placeholder="Nom d'utilisateur" 
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="mqtt-password" class="block text-sm font-medium mb-2">Mot de passe</label>
+                    <input type="password" id="mqtt-password" placeholder="Mot de passe" 
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="mqtt-topic" class="block text-sm font-medium mb-2">Topic par défaut</label>
+                    <input type="text" id="mqtt-topic" value="calibre/books" 
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="mqtt-qos" class="block text-sm font-medium mb-2">QoS (Quality of Service)</label>
+                    <select id="mqtt-qos" class="w-full px-3 py-2 rounded-md border"
+                            style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                        <option value="0">0 - Au plus une fois</option>
+                        <option value="1" selected>1 - Au moins une fois</option>
+                        <option value="2">2 - Exactement une fois</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="mqtt-ssl" class="mr-2">
+                        <label for="mqtt-ssl" class="text-sm font-medium">Utiliser SSL/TLS</label>
+                    </div>
+                    <p class="text-xs opacity-60 mt-1">Active une connexion sécurisée avec le broker MQTT</p>
+                </div>
+                <div class="md:col-span-2">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="mqtt-auto-reconnect" class="mr-2" checked>
+                        <label for="mqtt-auto-reconnect" class="text-sm font-medium">Reconnexion automatique</label>
+                    </div>
+                    <p class="text-xs opacity-60 mt-1">Tente de se reconnecter automatiquement en cas de déconnexion</p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-between">
+                <button class="px-4 py-2 rounded-md border" style="border-color: var(--border-muted);">
+                    Tester la connexion
+                </button>
+                <button class="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                    Enregistrer les paramètres
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bypasser Tab -->
+    <div id="bypasser-tab" class="admin-tab-content hidden">
+        <div class="rounded-lg p-6" style="background: var(--bg-soft); border: 1px solid var(--border-muted);">
+            <h2 class="text-lg font-semibold mb-4">Configuration du Bypasser</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="md:col-span-2">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="bypasser-enabled" class="mr-2" checked>
+                        <label for="bypasser-enabled" class="text-sm font-medium">Activer le bypasser</label>
+                    </div>
+                    <p class="text-xs opacity-60 mt-1">Permet de contourner les protections Cloudflare et autres restrictions</p>
+                </div>
+                <div>
+                    <label for="bypasser-delay" class="block text-sm font-medium mb-2">Délai d'attente (secondes)</label>
+                    <input type="number" id="bypasser-delay" value="5" min="1" max="60"
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="bypasser-retries" class="block text-sm font-medium mb-2">Nombre de tentatives</label>
+                    <input type="number" id="bypasser-retries" value="3" min="1" max="10"
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="bypasser-timeout" class="block text-sm font-medium mb-2">Timeout (secondes)</label>
+                    <input type="number" id="bypasser-timeout" value="30" min="10" max="300"
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="bypasser-user-agent" class="block text-sm font-medium mb-2">User-Agent</label>
+                    <select id="bypasser-user-agent" class="w-full px-3 py-2 rounded-md border"
+                            style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                        <option value="random">Aléatoire</option>
+                        <option value="chrome">Chrome</option>
+                        <option value="firefox">Firefox</option>
+                        <option value="safari">Safari</option>
+                        <option value="custom" selected>Personnalisé</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label for="bypasser-custom-user-agent" class="block text-sm font-medium mb-2">User-Agent personnalisé</label>
+                    <input type="text" id="bypasser-custom-user-agent" 
+                           value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="bypasser-proxy" class="block text-sm font-medium mb-2">Proxy</label>
+                    <input type="text" id="bypasser-proxy" placeholder="http://proxy.example.com:8080" 
+                           class="w-full px-3 py-2 rounded-md border"
+                           style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                </div>
+                <div>
+                    <label for="bypasser-rotation" class="block text-sm font-medium mb-2">Rotation des proxies</label>
+                    <select id="bypasser-rotation" class="w-full px-3 py-2 rounded-md border"
+                            style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
+                        <option value="disabled">Désactivée</option>
+                        <option value="request">Par requête</option>
+                        <option value="time">Par temps (minutes)</option>
+                        <option value="session">Par session</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="bypasser-rotate-ua" class="mr-2" checked>
+                        <label for="bypasser-rotate-ua" class="text-sm font-medium">Rotation des User-Agents</label>
+                    </div>
+                    <p class="text-xs opacity-60 mt-1">Change automatiquement le User-Agent pour chaque requête</p>
+                </div>
+                <div class="md:col-span-2">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="bypasser-stealth" class="mr-2">
+                        <label for="bypasser-stealth" class="text-sm font-medium">Mode furtif</label>
+                    </div>
+                    <p class="text-xs opacity-60 mt-1">Utilise des techniques avancées pour éviter la détection</p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-between">
+                <button class="px-4 py-2 rounded-md border" style="border-color: var(--border-muted);">
+                    Tester la configuration
+                </button>
+                <button class="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                    Enregistrer les paramètres
+                </button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Status Messages -->
+<div id="admin-status" class="fixed bottom-4 right-4 px-4 py-2 rounded-md text-white bg-green-600 hidden">
+    Paramètres enregistrés avec succès
+</div>
+
+<script>
+// Tab switching functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const tabButtons = document.querySelectorAll('.admin-tab-button');
+    const tabContents = document.querySelectorAll('.admin-tab-content');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const targetTab = this.getAttribute('data-tab');
+            
+            // Update button styles
+            tabButtons.forEach(btn => {
+                btn.style.borderColor = 'transparent';
+                btn.style.color = 'var(--text)';
+            });
+            this.style.borderColor = 'var(--primary-color)';
+            this.style.color = 'var(--primary-color)';
+            
+            // Show/hide content
+            tabContents.forEach(content => {
+                content.classList.add('hidden');
+            });
+            document.getElementById(targetTab + '-tab').classList.remove('hidden');
+        });
+    });
+    
+    // Save button functionality
+    const saveButtons = document.querySelectorAll('button:not(.admin-tab-button)');
+    saveButtons.forEach(button => {
+        if (button.textContent.includes('Enregistrer')) {
+            button.addEventListener('click', function() {
+                const statusDiv = document.getElementById('admin-status');
+                statusDiv.classList.remove('hidden');
+                setTimeout(() => {
+                    statusDiv.classList.add('hidden');
+                }, 3000);
+            });
+        }
+    });
+});
+</script>
