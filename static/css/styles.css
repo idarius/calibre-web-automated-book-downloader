@@ -1953,29 +1953,40 @@ button:disabled {
     visibility: visible;
 }
 
-/* Page Content Animation */
+/* Page Content Animation - Optimized for smoother transitions */
 .page-content {
-    animation: fadeInUp 0.4s ease-out;
+    animation: fadeInUp 0.2s ease-out;
+    /* Utiliser transform au lieu de modifier les propriétés de layout pour éviter les reflows */
+    will-change: opacity, transform;
 }
 
 @keyframes fadeInUp {
     from {
         opacity: 0;
-        transform: translateY(20px);
+        /* Utiliser transform3d pour une meilleure performance GPU */
+        transform: translate3d(0, 20px, 0);
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translate3d(0, 0, 0);
     }
 }
 
-/* Loading State for Page Content */
+/* Loading State for Page Content - Optimized for smoother transitions */
 .page-loading {
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 400px;
     color: var(--sidebar-text-secondary);
+    /* Utiliser opacity pour une transition plus fluide */
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    will-change: opacity;
+}
+
+.page-loading.active {
+    opacity: 1;
 }
 
 .page-loading::after {
@@ -1987,6 +1998,8 @@ button:disabled {
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-left: 12px;
+    /* Optimiser l'animation du spinner */
+    will-change: transform;
 }
 
 /* Popular Books Grid - 5 livres par ligne */

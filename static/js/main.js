@@ -222,6 +222,9 @@
     async navigateToPage(page, url) {
       if (page === this.currentPage) return;
       
+      const navigationStartTime = performance.now();
+      console.log(`⏱️ PERFORMANCE: Starting navigation to ${page} at ${navigationStartTime}ms`);
+      
       try {
         // DEBUG: Log current scroll position before navigation
         console.log(`DEBUG: Navigation to ${page} - Current scroll position:`, {
@@ -231,53 +234,90 @@
           bodyElement: document.body.scrollTop
         });
         
-        // Show loading state
-        this.showPageLoading();
-        
-        // Update current page IMMÉDIATEMENT pour éviter les conflits
-        this.currentPage = page;
-        
-        // Update active state in sidebar
-        this.updateActiveMenuItem(page);
-        
-        // Load page content with better error handling
-        await this.loadPageContent(page);
-        
-        // Update browser history with hash for SPA navigation
-        if (page === 'home') {
-          history.pushState({ page }, '', '/');
-        } else {
-          // Utiliser l'URL avec hash pour éviter les requêtes au serveur
-          const hashUrl = '/#' + page;
-          history.pushState({ page }, '', hashUrl);
-        }
-        
-        // Hide loading state
-        this.hidePageLoading();
-        
-        // Reset scroll position after loading content
-        this.resetScrollPosition();
-        
-        // DEBUG: Log scroll position after content load but before initialization
-        console.log(`DEBUG: After loading ${page} content - Scroll position:`, {
-          scrollX: window.scrollX,
-          scrollY: window.scrollY,
-          pageElement: document.documentElement.scrollTop,
-          bodyElement: document.body.scrollTop
-        });
-        
-        // Initialize page-specific functionality with delay
-        setTimeout(() => {
-          this.initializePage(page);
+        // Regrouper toutes les modifications DOM dans requestAnimationFrame pour éviter les reflows multiples
+        await new Promise(resolve => {
+          const rafStartTime = performance.now();
+          console.log(`⏱️ PERFORMANCE: Entering first requestAnimationFrame at ${rafStartTime}ms (${rafStartTime - navigationStartTime}ms after start)`);
           
-          // DEBUG: Log scroll position after page initialization
-          console.log(`DEBUG: After initializing ${page} - Scroll position:`, {
-            scrollX: window.scrollX,
-            scrollY: window.scrollY,
-            pageElement: document.documentElement.scrollTop,
-            bodyElement: document.body.scrollTop
+          requestAnimationFrame(async () => {
+            const rafExecTime = performance.now();
+            console.log(`⏱️ PERFORMANCE: First requestAnimationFrame executed at ${rafExecTime}ms (${rafExecTime - rafStartTime}ms after scheduling)`);
+            try {
+              // Show loading state
+              this.showPageLoading();
+              
+              // Update current page IMMÉDIATEMENT pour éviter les conflits
+              this.currentPage = page;
+              
+              // Update active state in sidebar
+              this.updateActiveMenuItem(page);
+              
+              // Load page content with better error handling
+              await this.loadPageContent(page);
+              
+              // Update browser history with hash for SPA navigation
+              if (page === 'home') {
+                history.pushState({ page }, '', '/');
+              } else {
+                // Utiliser l'URL avec hash pour éviter les requêtes au serveur
+                const hashUrl = '/#' + page;
+                history.pushState({ page }, '', hashUrl);
+              }
+              
+              // Hide loading state
+              this.hidePageLoading();
+              
+              // Reset scroll position after loading content
+              this.resetScrollPosition();
+              
+              // DEBUG: Log scroll position after content load but before initialization
+              console.log(`DEBUG: After loading ${page} content - Scroll position:`, {
+                scrollX: window.scrollX,
+                scrollY: window.scrollY,
+                pageElement: document.documentElement.scrollTop,
+                bodyElement: document.body.scrollTop
+              });
+              
+              // Initialize page-specific functionality SANS délai pour éviter le décalage
+              // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt
+              const initRafStartTime = performance.now();
+              console.log(`⏱️ PERFORMANCE: Scheduling second requestAnimationFrame at ${initRafStartTime}ms (${initRafStartTime - navigationStartTime}ms after start)`);
+              
+              requestAnimationFrame(() => {
+                const initRafExecTime = performance.now();
+                console.log(`⏱️ PERFORMANCE: Second requestAnimationFrame executed at ${initRafExecTime}ms (${initRafExecTime - initRafStartTime}ms after scheduling)`);
+                
+                this.initializePage(page);
+                
+                const initCompleteTime = performance.now();
+                console.log(`⏱️ PERFORMANCE: Page initialization completed at ${initCompleteTime}ms (${initCompleteTime - navigationStartTime}ms total navigation time)`);
+                
+                // DEBUG: Log scroll position after page initialization
+                console.log(`DEBUG: After initializing ${page} - Scroll position:`, {
+                  scrollX: window.scrollX,
+                  scrollY: window.scrollY,
+                  pageElement: document.documentElement.scrollTop,
+                  bodyElement: document.body.scrollTop
+                });
+                
+                resolve();
+              });
+            } catch (error) {
+              console.error('Navigation error:', error);
+              this.hidePageLoading();
+              
+              // Show error message and fallback
+              this.showErrorMessage('Erreur de chargement. Tentative de navigation traditionnelle...');
+              
+              // Fallback to traditional navigation after a short delay
+              setTimeout(() => {
+                window.location.href = url;
+              }, 1000);
+              
+              resolve();
+            }
           });
-        }, 50);
+        });
         
       } catch (error) {
         console.error('Navigation error:', error);
@@ -428,9 +468,20 @@
         
         // For search and popular pages, we need to ensure the content is properly structured
         if (page === 'search' || page === 'popular') {
-          // Add a small delay to ensure DOM is updated before initializing
-          await new Promise(resolve => setTimeout(resolve, 50));
-          console.log(`Delay added for ${page} page initialization`);
+          // OPTIMISATION: Réduire le délai de 50ms à 10ms et utiliser requestAnimationFrame
+          // au lieu de setTimeout pour une meilleure synchronisation avec le cycle de rendu
+          const delayStartTime = performance.now();
+          console.log(`⏱️ PERFORMANCE: Starting optimized 10ms delay for ${page} at ${delayStartTime}ms`);
+          
+          await new Promise(resolve => {
+            requestAnimationFrame(() => {
+              const delayEndTime = performance.now();
+              console.log(`⏱️ PERFORMANCE: Optimized delay completed for ${page} at ${delayEndTime}ms (actual: ${delayEndTime - delayStartTime}ms)`);
+              resolve();
+            });
+          });
+          
+          console.log(`Optimized delay added for ${page} page initialization`);
           
           // DEBUG: Log scroll position after delay
           console.log(`DEBUG: After ${page} delay - Scroll position:`, {
@@ -472,10 +523,18 @@
     },
     
     async getSearchContent() {
+      const searchFetchStart = performance.now();
+      console.log('⏱️ PERFORMANCE: Starting getSearchContent fetch at', searchFetchStart, 'ms');
+      
       try {
         const response = await fetch('/request/search');
+        const responseTime = performance.now();
+        console.log('⏱️ PERFORMANCE: Search fetch response received at', responseTime, 'ms (', responseTime - searchFetchStart, 'ms)');
+        
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
+        const parseTime = performance.now();
+        console.log('⏱️ PERFORMANCE: Search JSON parsed at', parseTime, 'ms (', parseTime - responseTime, 'ms)');
         
         // Validate response structure
         if (!data || typeof data !== 'object') {
@@ -511,10 +570,18 @@
     },
     
     async getPopularContent() {
+      const popularFetchStart = performance.now();
+      console.log('⏱️ PERFORMANCE: Starting getPopularContent fetch at', popularFetchStart, 'ms');
+      
       try {
         const response = await fetch('/request/popular');
+        const responseTime = performance.now();
+        console.log('⏱️ PERFORMANCE: Popular fetch response received at', responseTime, 'ms (', responseTime - popularFetchStart, 'ms)');
+        
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
+        const parseTime = performance.now();
+        console.log('⏱️ PERFORMANCE: Popular JSON parsed at', parseTime, 'ms (', parseTime - responseTime, 'ms)');
         
         // Validate response structure
         if (!data || typeof data !== 'object') {
@@ -550,10 +617,18 @@
     },
     
     async getAdminContent() {
+      const adminFetchStart = performance.now();
+      console.log('⏱️ PERFORMANCE: Starting getAdminContent fetch at', adminFetchStart, 'ms');
+      
       try {
         const response = await fetch('/request/admin');
+        const responseTime = performance.now();
+        console.log('⏱️ PERFORMANCE: Admin fetch response received at', responseTime, 'ms (', responseTime - adminFetchStart, 'ms)');
+        
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
+        const parseTime = performance.now();
+        console.log('⏱️ PERFORMANCE: Admin JSON parsed at', parseTime, 'ms (', parseTime - responseTime, 'ms)');
         
         // Validate response structure
         if (!data || typeof data !== 'object') {
@@ -592,8 +667,8 @@
       // Initialisation de la page d'administration
       console.log('Initializing admin page...');
       
-      // Ajouter un petit délai pour s'assurer que le DOM est prêt
-      setTimeout(() => {
+      // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt SANS délai
+      requestAnimationFrame(() => {
         // Lier les boutons ou formulaires spécifiques à l'administration
         const adminButtons = document.querySelectorAll('[data-admin-action]');
         adminButtons.forEach(button => {
@@ -606,7 +681,7 @@
         });
         
         console.log('Admin page initialized successfully');
-      }, 100);
+      });
     },
     
     showPageLoading() {
@@ -624,17 +699,20 @@
     },
     
     initializePage(page) {
-      switch (page) {
-        case 'search':
-          this.initializeSearchPage();
-          break;
-        case 'popular':
-          this.initializePopularPage();
-          break;
-        case 'admin':
-          this.initializeAdminPage();
-          break;
-      }
+      // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt sans délai
+      requestAnimationFrame(() => {
+        switch (page) {
+          case 'search':
+            this.initializeSearchPage();
+            break;
+          case 'popular':
+            this.initializePopularPage();
+            break;
+          case 'admin':
+            this.initializeAdminPage();
+            break;
+        }
+      });
     },
     
     refreshSearchElements() {
@@ -685,85 +763,111 @@
     },
 
     initializeSearchPage() {
-      // Attendre que le DOM soit complètement chargé
-      setTimeout(() => {
-        // Mettre à jour les références aux éléments de recherche
-        this.refreshSearchElements();
-        
-        // Réinitialiser l'état de recherche au chargement de la page
-        searchState.reset();
-        
-        // Re-bind search events avec une vérification d'existence
-        const searchBtn = document.getElementById('search-button');
-        const searchInput = document.getElementById('search-input');
-        const advSearchBtn = document.getElementById('adv-search-button');
-        
-        console.log('Initializing search page, elements found:', {
-          searchBtn: !!searchBtn,
-          searchInput: !!searchInput,
-          advSearchBtn: !!advSearchBtn
-        });
-        
-        // Toujours lier les événements, même si l'objet search n'est pas encore disponible
-        if (searchBtn) {
-          // Utiliser une approche plus simple et fiable pour lier les événements
-          // Supprimer tous les gestionnaires d'événements existants
-          searchBtn.removeEventListener('click', this.searchButtonHandler);
-          // Créer et attacher le nouveau gestionnaire
-          this.searchButtonHandler = (e) => {
-            e.preventDefault();
-            console.log('Search button clicked');
-            this.performSearch();
-          };
-          searchBtn.addEventListener('click', this.searchButtonHandler);
-        }
-        
-        if (searchInput) {
-          // Utiliser une approche plus simple et fiable pour lier les événements
-          // Supprimer tous les gestionnaires d'événements existants
-          searchInput.removeEventListener('keydown', this.searchInputHandler);
-          // Créer et attacher le nouveau gestionnaire
-          this.searchInputHandler = (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              console.log('Enter key pressed in search input');
-              this.performSearch();
+      // Utiliser requestAnimationFrame avec retry pour s'assurer que le DOM est prêt
+      const initWithRetry = (retryCount = 0) => {
+        requestAnimationFrame(() => {
+          try {
+            // Mettre à jour les références aux éléments de recherche
+            this.refreshSearchElements();
+            
+            // Vérifier que les éléments essentiels existent
+            const searchBtn = document.getElementById('search-button');
+            const searchInput = document.getElementById('search-input');
+            const advSearchBtn = document.getElementById('adv-search-button');
+            
+            console.log('Initializing search page, elements found:', {
+              searchBtn: !!searchBtn,
+              searchInput: !!searchInput,
+              advSearchBtn: !!advSearchBtn,
+              retryCount
+            });
+            
+            // Si les éléments essentiels ne sont pas trouvés, réessayer
+            if (!searchBtn && !searchInput && retryCount < 3) {
+              console.warn('Search elements not found, retrying...');
+              initWithRetry(retryCount + 1);
+              return;
             }
-          };
-          searchInput.addEventListener('keydown', this.searchInputHandler);
-        }
-        
-        // Advanced search toggle removed - filters are always visible
-        console.log('Advanced search toggle removed - filters are always visible');
-        
-        // Bind advanced search button
-        if (advSearchBtn) {
-          // Utiliser une approche plus simple et fiable pour lier les événements
-          // Supprimer tous les gestionnaires d'événements existants
-          advSearchBtn.removeEventListener('click', this.advSearchButtonHandler);
-          // Créer et attacher le nouveau gestionnaire
-          this.advSearchButtonHandler = (e) => {
-            e.preventDefault();
-            console.log('Advanced search button clicked');
-            this.performSearch();
-          };
-          advSearchBtn.addEventListener('click', this.advSearchButtonHandler);
-        }
-        
-        // Initialize view toggle for search results
-        if (typeof viewManager !== 'undefined') {
-          // Forcer la réinitialisation du gestionnaire de vue
-          viewManager.currentView = localStorage.getItem(VIEW_PREFERENCE_KEY) || VIEW_MODES.GRID;
-          
-          // Ajouter un petit délai pour s'assurer que les éléments sont disponibles
-          setTimeout(() => {
-            viewManager.reinitViewButtons();
-            console.log('View manager reinitialized for search page');
-          }, 50);
-        } else {
-          console.error('View manager not available');
-        }
-      }, 200); // Augmenté le délai pour s'assurer que le DOM est prêt
+            
+            // Réinitialiser l'état de recherche au chargement de la page
+            searchState.reset();
+            
+            // Toujours lier les événements, même si l'objet search n'est pas encore disponible
+            if (searchBtn) {
+              // Utiliser une approche plus simple et fiable pour lier les événements
+              // Supprimer tous les gestionnaires d'événements existants
+              searchBtn.removeEventListener('click', this.searchButtonHandler);
+              // Créer et attacher le nouveau gestionnaire
+              this.searchButtonHandler = (e) => {
+                e.preventDefault();
+                console.log('Search button clicked');
+                this.performSearch();
+              };
+              searchBtn.addEventListener('click', this.searchButtonHandler);
+            }
+            
+            if (searchInput) {
+              // Utiliser une approche plus simple et fiable pour lier les événements
+              // Supprimer tous les gestionnaires d'événements existants
+              searchInput.removeEventListener('keydown', this.searchInputHandler);
+              // Créer et attacher le nouveau gestionnaire
+              this.searchInputHandler = (e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  console.log('Enter key pressed in search input');
+                  this.performSearch();
+                }
+              };
+              searchInput.addEventListener('keydown', this.searchInputHandler);
+            }
+            
+            // Advanced search toggle removed - filters are always visible
+            console.log('Advanced search toggle removed - filters are always visible');
+            
+            // Bind advanced search button
+            if (advSearchBtn) {
+              // Utiliser une approche plus simple et fiable pour lier les événements
+              // Supprimer tous les gestionnaires d'événements existants
+              advSearchBtn.removeEventListener('click', this.advSearchButtonHandler);
+              // Créer et attacher le nouveau gestionnaire
+              this.advSearchButtonHandler = (e) => {
+                e.preventDefault();
+                console.log('Advanced search button clicked');
+                this.performSearch();
+              };
+              advSearchBtn.addEventListener('click', this.advSearchButtonHandler);
+            }
+            
+            // Initialize view toggle for search results avec vérification
+            if (typeof viewManager !== 'undefined') {
+              // Forcer la réinitialisation du gestionnaire de vue
+              viewManager.currentView = localStorage.getItem(VIEW_PREFERENCE_KEY) || VIEW_MODES.GRID;
+              
+              // Vérifier que les éléments de vue existent avant de réinitialiser
+              const viewToggleContainer = document.getElementById('view-toggle-container');
+              if (viewToggleContainer) {
+                // Utiliser requestAnimationFrame au lieu de setTimeout pour éviter le décalage
+                requestAnimationFrame(() => {
+                  viewManager.reinitViewButtons();
+                  console.log('View manager reinitialized for search page');
+                });
+              } else {
+                console.log('View toggle container not found, skipping view manager reinitialization');
+              }
+            } else {
+              console.warn('View manager not available during search page initialization');
+            }
+            
+          } catch (error) {
+            console.error('Error initializing search page:', error);
+            if (retryCount < 3) {
+              initWithRetry(retryCount + 1);
+            }
+          }
+        });
+      };
+      
+      initWithRetry();
     },
     
     performSearch() {
@@ -771,27 +875,30 @@
       console.log('search object available:', typeof search !== 'undefined');
       console.log('search.run available:', typeof search !== 'undefined' && search.run);
       
-      // Exécuter la recherche en utilisant l'objet global search si disponible
-      if (typeof search !== 'undefined' && search.run) {
-        console.log('Using global search object');
-        try {
-          search.run();
-        } catch (error) {
-          console.error('Error in global search.run():', error);
-          // Fallback vers la méthode manuelle
+      // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt SANS délai
+      requestAnimationFrame(() => {
+        // Exécuter la recherche en utilisant l'objet global search si disponible
+        if (typeof search !== 'undefined' && search.run) {
+          console.log('Using global search object');
+          try {
+            search.run();
+          } catch (error) {
+            console.error('Error in global search.run():', error);
+            // Fallback vers la méthode manuelle
+            this.performManualSearch();
+          }
+        } else {
+          console.log('Using fallback search method');
           this.performManualSearch();
         }
-      } else {
-        console.log('Using fallback search method');
-        this.performManualSearch();
-      }
+      });
     },
     
     performManualSearch() {
       console.log('=== PERFORM MANUAL SEARCH ===');
       
-      // Ajouter un petit délai pour s'assurer que le DOM est prêt
-      setTimeout(() => {
+      // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt SANS délai
+      requestAnimationFrame(() => {
         // Fallback: exécuter la recherche directement
         const qs = utils.buildQuery();
         console.log('Search query string:', qs);
@@ -897,15 +1004,15 @@
             console.log('Hiding loading indicator');
           }
         });
-      }, 200); // Augmenté le délai pour s'assurer que le DOM est prêt
+      });
     },
     
     initializePopularPage() {
       console.log('=== INITIALIZING POPULAR PAGE ===');
       
-      // Make sure DOM elements exist before trying to use them
+      // Utiliser requestAnimationFrame avec retry pour s'assurer que le DOM est prêt
       const initWithRetry = (retryCount = 0) => {
-        setTimeout(() => {
+        requestAnimationFrame(() => {
           try {
             // Check if required elements exist
             const container = document.getElementById('popular-books-container');
@@ -924,8 +1031,9 @@
             console.log('viewToggleContainer:', !!viewToggleContainer, 'id:', viewToggleContainer?.id);
             console.log('retryCount:', retryCount);
             
-            if (!container || !loading) {
-              console.warn('Popular page elements not found, retrying...');
+            // Si le conteneur principal n'existe pas, réessayer
+            if (!container) {
+              console.warn('Popular books container not found, retrying...');
               if (retryCount < 3) {
                 initWithRetry(retryCount + 1);
               } else {
@@ -935,23 +1043,31 @@
               return;
             }
             
-            // Utiliser le viewManager pour initialiser les boutons de vue
+            // Utiliser le viewManager pour initialiser les boutons de vue avec vérification
             if (typeof viewManager !== 'undefined') {
               console.log('Using viewManager to initialize popular view toggle');
-              viewManager.reinitPopularViewButtons();
+              // Ajouter un délai supplémentaire pour s'assurer que les boutons sont dans le DOM
+              const viewToggleStart = performance.now();
+              console.log('⏱️ PERFORMANCE: Starting 100ms delay for view toggle at', viewToggleStart, 'ms');
+              
+              setTimeout(() => {
+                const viewToggleExecTime = performance.now();
+                console.log('⏱️ PERFORMANCE: 100ms view toggle delay completed at', viewToggleExecTime, 'ms (actual:', viewToggleExecTime - viewToggleStart, 'ms)');
+                viewManager.reinitPopularViewButtons();
+              }, 100);
             } else {
-              console.error('viewManager not available for popular view initialization');
+              console.warn('viewManager not available for popular view initialization');
             }
             
-            // Fetch popular books immediately
+            // Fetch popular books immediately avec vérification
             console.log('Initializing popular page, fetching books...');
             if (typeof homeSections !== 'undefined') {
               homeSections.fetchPopularBooks();
             } else {
-              console.error('homeSections object not available for fetching popular books');
+              console.warn('homeSections object not available for fetching popular books');
             }
             
-            // Re-bind refresh button
+            // Re-bind refresh button avec vérification
             const refreshBtn = document.getElementById('refresh-popular');
             if (refreshBtn) {
               // Remove existing listeners to avoid duplicates
@@ -966,14 +1082,16 @@
             }
             
             // Set up a timeout to check if loading is stuck
-            setTimeout(() => {
-              if (loading && !loading.classList.contains('hidden')) {
-                console.warn('Popular books loading seems stuck, retrying...');
-                if (typeof homeSections !== 'undefined') {
-                  homeSections.fetchPopularBooks();
+            if (loading) {
+              setTimeout(() => {
+                if (loading && !loading.classList.contains('hidden')) {
+                  console.warn('Popular books loading seems stuck, retrying...');
+                  if (typeof homeSections !== 'undefined') {
+                    homeSections.fetchPopularBooks();
+                  }
                 }
-              }
-            }, 5000);
+              }, 5000);
+            }
             
           } catch (error) {
             console.error('Error initializing popular page:', error);
@@ -983,7 +1101,7 @@
               this.showPopularPageError();
             }
           }
-        }, 100 + (retryCount * 200)); // Increasing delay with each retry
+        });
       };
       
       initWithRetry();
@@ -1170,62 +1288,69 @@
     async handleInitialPageLoad(page) {
       console.log(`=== handleInitialPageLoad called for: ${page} ===`);
       
-      try {
-        // Masquer toutes les pages sauf la cible
-        const allPages = document.querySelectorAll('[id$="-page"]');
-        for (const pageEl of allPages) {
-          pageEl.classList.add('hidden');
-        }
-        
-        // Afficher la page cible
-        const targetPage = document.getElementById(`${page}-page`);
-        if (!targetPage) {
-          throw new Error(`Target page container not found: #${page}-page`);
-        }
-        targetPage.classList.remove('hidden');
-        console.log(`Target page ${page}-page shown`);
-        
-        // Charger le contenu
-        await this.loadPageContent(page);
-        
-        // Reset scroll position for initial page load
-        this.resetScrollPosition();
-        
-        // Initialiser les fonctionnalités de la page
-        setTimeout(() => {
-          this.initializePage(page);
-        }, 50);
-        
-        // Mettre à jour l'historique du navigateur
-        if (page === 'home') {
-          history.pushState({ page }, '', '/');
-        } else {
-          const hashUrl = '/#' + page;
-          history.pushState({ page }, '', hashUrl);
-        }
-        
-        console.log(`Initial page ${page} loaded successfully`);
-        
-      } catch (error) {
-        console.error('Error in handleInitialPageLoad:', error);
-        
-        // Afficher un message d'erreur dans la page cible
-        const targetPage = document.getElementById(`${page}-page`);
-        if (targetPage) {
-          targetPage.innerHTML = `
-            <div class="text-center py-8">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-red-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p class="text-lg font-medium mb-2">Erreur lors du chargement de la page</p>
-              <p class="text-sm opacity-70 mb-4">Veuillez réessayer plus tard</p>
-              <button onclick="navigation.handleInitialPageLoad('${page}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md">
-                Réessayer
-              </button>
-            </div>
-          `;
-        }
-      }
+      // Regrouper toutes les modifications DOM dans requestAnimationFrame
+      await new Promise(resolve => {
+        requestAnimationFrame(async () => {
+          try {
+            // Masquer toutes les pages sauf la cible
+            const allPages = document.querySelectorAll('[id$="-page"]');
+            for (const pageEl of allPages) {
+              pageEl.classList.add('hidden');
+            }
+            
+            // Afficher la page cible
+            const targetPage = document.getElementById(`${page}-page`);
+            if (!targetPage) {
+              throw new Error(`Target page container not found: #${page}-page`);
+            }
+            targetPage.classList.remove('hidden');
+            console.log(`Target page ${page}-page shown`);
+            
+            // Charger le contenu
+            await this.loadPageContent(page);
+            
+            // Reset scroll position for initial page load
+            this.resetScrollPosition();
+            
+            // Initialiser les fonctionnalités de la page SANS délai pour éviter le décalage
+            requestAnimationFrame(() => {
+              this.initializePage(page);
+              resolve();
+            });
+            
+            // Mettre à jour l'historique du navigateur
+            if (page === 'home') {
+              history.pushState({ page }, '', '/');
+            } else {
+              const hashUrl = '/#' + page;
+              history.pushState({ page }, '', hashUrl);
+            }
+            
+            console.log(`Initial page ${page} loaded successfully`);
+            
+          } catch (error) {
+            console.error('Error in handleInitialPageLoad:', error);
+            
+            // Afficher un message d'erreur dans la page cible
+            const targetPage = document.getElementById(`${page}-page`);
+            if (targetPage) {
+              targetPage.innerHTML = `
+                <div class="text-center py-8">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-red-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p class="text-lg font-medium mb-2">Erreur lors du chargement de la page</p>
+                  <p class="text-sm opacity-70 mb-4">Veuillez réessayer plus tard</p>
+                  <button onclick="navigation.handleInitialPageLoad('${page}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md">
+                    Réessayer
+                  </button>
+                </div>
+              `;
+            }
+            resolve();
+          }
+        });
+      });
     },
     
   };
@@ -2033,7 +2158,13 @@
     
     updateViewButtons() {
       // Mettre à jour l'état actif des boutons
-      document.querySelectorAll('.view-toggle').forEach(btn => {
+      const toggleButtons = document.querySelectorAll('.view-toggle');
+      if (toggleButtons.length === 0) {
+        console.warn('View toggle buttons not found in updateViewButtons');
+        return;
+      }
+      
+      toggleButtons.forEach(btn => {
         if (btn.getAttribute('data-view') === this.currentView) {
           btn.classList.add('active');
         } else {
@@ -2041,7 +2172,7 @@
         }
       });
       
-      // Mettre à jour les classes du conteneur
+      // Mettre à jour les classes du conteneur avec vérifications robustes
       let resultsContainer = el.resultsContainer;
       if (!resultsContainer) {
         // Essayer de rafraîchir les éléments si el.resultsContainer est null
@@ -2060,7 +2191,11 @@
         resultsContainer.classList.remove('grid-view', 'list-view');
         resultsContainer.classList.add(`${this.currentView}-view`);
       } else {
-        console.error('Results container not found in updateViewButtons');
+        // Ne pas afficher d'erreur si nous sommes sur une page qui n'a pas de conteneur de résultats
+        const currentPage = typeof navigation !== 'undefined' ? navigation.currentPage : 'unknown';
+        if (currentPage === 'search') {
+          console.warn('Results container not found in updateViewButtons on search page - this might be expected during initialization');
+        }
       }
     },
     
@@ -2074,18 +2209,19 @@
     
     renderGrid(books) {
       try {
-        // Vérifier que resultsContainer existe
-        if (!el.resultsContainer) {
-          console.error('Results container not found in renderGrid, refreshing elements...');
+        // Vérifier que resultsContainer existe avec retry
+        let resultsContainer = el.resultsContainer;
+        if (!resultsContainer) {
+          console.warn('Results container not found in renderGrid, refreshing elements...');
           // Tenter de rafraîchir les éléments
           if (typeof navigation !== 'undefined' && navigation.refreshSearchElements) {
             navigation.refreshSearchElements();
           }
           
           // Si toujours null, essayer de récupérer directement
-          el.resultsContainer = document.getElementById('results-container');
-          if (!el.resultsContainer) {
-            console.error('Results container still not found after refresh');
+          resultsContainer = document.getElementById('results-container');
+          if (!resultsContainer) {
+            console.warn('Results container not found - this might be expected if not on search page');
             return;
           }
         }
@@ -2098,16 +2234,16 @@
         }
         
         // S'assurer que le conteneur est vide avant d'ajouter du contenu
-        el.resultsContainer.innerHTML = '';
+        resultsContainer.innerHTML = '';
         
         // Nettoyer les éléments optimistes qui pourraient encore être présents
-        this.cleanupOptimisticElements(el.resultsContainer);
+        this.cleanupOptimisticElements(resultsContainer);
         
         // Vérifier si nous avons des livres à afficher
         if (!books || books.length === 0) {
           // Masquer le conteneur s'il n'y a pas de résultats pour éviter le cadre vide
-          el.resultsContainer.style.display = 'none';
-          el.resultsContainer.classList.add('empty-container');
+          resultsContainer.style.display = 'none';
+          resultsContainer.classList.add('empty-container');
           if (el.noResults) {
             utils.show(el.noResults);
             el.noResults.style.display = '';
@@ -2116,8 +2252,8 @@
         }
         
         // Afficher le conteneur et masquer le message "no results"
-        el.resultsContainer.style.display = '';
-        el.resultsContainer.classList.remove('empty-container');
+        resultsContainer.style.display = '';
+        resultsContainer.classList.remove('empty-container');
         if (el.noResults) {
           utils.hide(el.noResults);
           el.noResults.style.display = 'none';
@@ -2141,12 +2277,12 @@
         
         // N'ajouter le contenu que s'il y a des éléments valides
         if (validCards > 0) {
-          el.resultsContainer.appendChild(frag);
-          el.resultsContainer.classList.remove('empty-container');
+          resultsContainer.appendChild(frag);
+          resultsContainer.classList.remove('empty-container');
         } else {
           // Si aucun élément valide n'a été créé, masquer le conteneur
-          el.resultsContainer.style.display = 'none';
-          el.resultsContainer.classList.add('empty-container');
+          resultsContainer.style.display = 'none';
+          resultsContainer.classList.add('empty-container');
           if (el.noResults) {
             utils.show(el.noResults);
             el.noResults.style.display = '';
@@ -2155,9 +2291,10 @@
       } catch (error) {
         console.error('Error in renderGrid:', error);
         // En cas d'erreur, masquer le conteneur et afficher le message d'erreur
-        if (el.resultsContainer) {
-          el.resultsContainer.style.display = 'none';
-          el.resultsContainer.classList.add('empty-container');
+        const resultsContainer = el.resultsContainer || document.getElementById('results-container');
+        if (resultsContainer) {
+          resultsContainer.style.display = 'none';
+          resultsContainer.classList.add('empty-container');
         }
         if (el.noResults) {
           utils.show(el.noResults);
@@ -2174,20 +2311,19 @@
       let errorMessage = '';
       
       try {
-        // Vérifier que resultsContainer existe
-        if (!el.resultsContainer) {
-          console.error('Results container not found in renderList, refreshing elements...');
+        // Vérifier que resultsContainer existe avec retry
+        let resultsContainer = el.resultsContainer;
+        if (!resultsContainer) {
+          console.warn('Results container not found in renderList, refreshing elements...');
           // Tenter de rafraîchir les éléments
           if (typeof navigation !== 'undefined' && navigation.refreshSearchElements) {
             navigation.refreshSearchElements();
           }
           
           // Si toujours null, essayer de récupérer directement
-          el.resultsContainer = document.getElementById('results-container');
-          if (!el.resultsContainer) {
-            criticalError = true;
-            errorMessage = 'Results container not found after refresh attempts';
-            console.error(errorMessage);
+          resultsContainer = document.getElementById('results-container');
+          if (!resultsContainer) {
+            console.warn('Results container not found - this might be expected if not on search page');
             return;
           }
         }
@@ -2200,11 +2336,11 @@
         }
         
         // S'assurer que le conteneur est vide avant d'ajouter du contenu
-        el.resultsContainer.innerHTML = '';
+        resultsContainer.innerHTML = '';
         
         // Nettoyer les éléments optimistes qui pourraient encore être présents
         try {
-          this.cleanupOptimisticElements(el.resultsContainer);
+          this.cleanupOptimisticElements(resultsContainer);
         } catch (cleanupError) {
           console.warn('Error during cleanup:', cleanupError);
           // Continuer malgré l'erreur de nettoyage
@@ -2214,8 +2350,8 @@
         if (!books || books.length === 0) {
           console.log('No books to display, showing empty state');
           // Masquer le conteneur s'il n'y a pas de résultats pour éviter le cadre vide
-          el.resultsContainer.style.display = 'none';
-          el.resultsContainer.classList.add('empty-container');
+          resultsContainer.style.display = 'none';
+          resultsContainer.classList.add('empty-container');
           if (el.noResults) {
             utils.show(el.noResults);
             el.noResults.style.display = '';
@@ -2224,8 +2360,8 @@
         }
         
         // Afficher le conteneur et masquer le message "no results"
-        el.resultsContainer.style.display = '';
-        el.resultsContainer.classList.remove('empty-container');
+        resultsContainer.style.display = '';
+        resultsContainer.classList.remove('empty-container');
         if (el.noResults) {
           utils.hide(el.noResults);
           el.noResults.style.display = 'none';
@@ -2257,7 +2393,7 @@
             </table>
           `;
           
-          el.resultsContainer.appendChild(table);
+          resultsContainer.appendChild(table);
           tbody = document.getElementById('results-tbody');
           
           if (!tbody) {
@@ -2325,7 +2461,7 @@
         // Si aucune ligne valide n'a été créée, afficher un message approprié
         if (validRows === 0) {
           console.warn('No valid rows were created');
-          el.resultsContainer.innerHTML = `
+          resultsContainer.innerHTML = `
             <div class="text-center p-4">
               <p class="text-red-500 mb-2">Aucun livre ne peut être affiché</p>
               <p class="text-sm opacity-70">Vérifiez les données et réessayez</p>
@@ -2335,7 +2471,7 @@
             </div>
           `;
         } else {
-          el.resultsContainer.classList.remove('empty-container');
+          resultsContainer.classList.remove('empty-container');
           
           // S'il y a eu des erreurs mais que des lignes valides existent, afficher un avertissement
           if (errorCount > 0) {
@@ -2355,8 +2491,9 @@
         console.error('Error stack:', error.stack);
         
         // En cas d'erreur critique, afficher un message détaillé mais ne masquer le conteneur qu'en dernier recours
-        if (el.resultsContainer) {
-          el.resultsContainer.innerHTML = `
+        const resultsContainer = el.resultsContainer || document.getElementById('results-container');
+        if (resultsContainer) {
+          resultsContainer.innerHTML = `
             <div class="text-center p-4">
               <p class="text-red-500 mb-2">Erreur critique lors de l'affichage en liste</p>
               <p class="text-sm opacity-70">${errorMessage}</p>
@@ -2506,8 +2643,27 @@
     updatePopularViewButtons() {
       console.log('=== UPDATE POPULAR VIEW BUTTONS CALLED IN VIEWMANAGER ===');
       
+      // Vérifier d'abord si nous sommes sur la page populaire
+      const currentPage = typeof navigation !== 'undefined' ? navigation.currentPage : 'unknown';
+      if (currentPage !== 'popular') {
+        console.log('Not on popular page, skipping updatePopularViewButtons');
+        return;
+      }
+      
       // Mettre à jour l'état actif des boutons - utiliser le bon sélecteur CSS
-      document.querySelectorAll('#popular-view-toggle-container .view-toggle').forEach(btn => {
+      const toggleContainer = document.getElementById('popular-view-toggle-container');
+      if (!toggleContainer) {
+        console.warn('Popular view toggle container not found - might be expected during initialization');
+        return;
+      }
+      
+      const toggleButtons = toggleContainer.querySelectorAll('.view-toggle');
+      if (toggleButtons.length === 0) {
+        console.warn('Popular view toggle buttons not found - might be expected during initialization');
+        return;
+      }
+      
+      toggleButtons.forEach(btn => {
         if (btn.getAttribute('data-view') === this.popularCurrentView) {
           btn.classList.add('active');
         } else {
@@ -2515,13 +2671,13 @@
         }
       });
       
-      // Mettre à jour les classes du conteneur
-      let popularContainer = document.getElementById('popular-books-container');
+      // Mettre à jour les classes du conteneur avec vérification robuste
+      const popularContainer = document.getElementById('popular-books-container');
       if (popularContainer) {
         popularContainer.classList.remove('grid-view', 'list-view');
         popularContainer.classList.add(`${this.popularCurrentView}-view`);
       } else {
-        console.error('Popular books container not found in updatePopularViewButtons');
+        console.warn('Popular books container not found in updatePopularViewButtons - this might be expected during initialization');
       }
     },
     
@@ -3023,9 +3179,9 @@
     async run() {
       console.log('=== SEARCH.RUN CALLED ===');
       
-      // Ajouter un petit délai pour s'assurer que le DOM est prêt
+      // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt SANS délai
       return new Promise((resolve, reject) => {
-        setTimeout(async () => {
+        requestAnimationFrame(async () => {
           try {
             // S'assurer que les éléments de recherche sont à jour
             if (typeof navigation !== 'undefined' && navigation.refreshSearchElements) {
@@ -3148,7 +3304,7 @@
               console.log('Hiding search loading indicator');
             }
           }
-        }, 200); // Augmenté le délai pour s'assurer que le DOM est prêt
+        });
       });
     }
   };
@@ -3621,10 +3777,15 @@
           
           try {
             // Add a small delay to prevent flicker for fast responses
+            const sidebarFetchStart = performance.now();
+            console.log('⏱️ PERFORMANCE: Starting sidebar fetch with 300ms minimum delay at', sidebarFetchStart, 'ms');
+            
             const fetchPromise = utils.j(API.status);
             const minDelayPromise = new Promise(resolve => setTimeout(resolve, 300));
             
             [data] = await Promise.all([fetchPromise, minDelayPromise]);
+            const sidebarFetchEnd = performance.now();
+            console.log('⏱️ PERFORMANCE: Sidebar fetch completed at', sidebarFetchEnd, 'ms (total:', sidebarFetchEnd - sidebarFetchStart, 'ms - includes 300ms minimum delay)');
             apiCache.set('status', data);
           } catch (fetchError) {
             console.error('Error fetching status:', fetchError);
@@ -4514,9 +4675,30 @@
   // ---- Home Sections ----
   const homeSections = {
     async fetchRecentDownloads() {
+      // Fonctionnalité désactivée - les "recent downloads" ne sont plus utilisées
+      console.log('Recent downloads feature is disabled - fetchRecentDownloads skipped');
+      return;
+      
+      // Ancien code conservé pour référence si la fonctionnalité doit être réactivée
+      /*
+      // Vérifier si nous sommes sur la page d'accueil avant de continuer
+      const currentPage = typeof navigation !== 'undefined' ? navigation.currentPage : 'unknown';
+      if (currentPage !== 'home') {
+        console.log('Not on home page, skipping fetchRecentDownloads');
+        return;
+      }
+      
       try {
         console.log('Fetching recent downloads...');
-        utils.show(el.recentDownloadsLoading);
+        
+        // Vérifier que les éléments existent avant de les manipuler
+        const recentDownloadsLoading = el.recentDownloadsLoading || document.getElementById('recent-downloads-loading');
+        if (recentDownloadsLoading) {
+          utils.show(recentDownloadsLoading);
+        } else {
+          console.warn('Recent downloads loading element not found - feature might be disabled');
+          return; // Sortir si l'élément n'existe pas
+        }
         
         // Récupérer les livres récemment téléchargés (disponibles)
         const status = await utils.j(API.status);
@@ -4524,43 +4706,92 @@
         const recentBooks = status.available ? Object.values(status.available).slice(0, 12) : [];
         console.log('Recent books:', recentBooks);
         
-        utils.hide(el.recentDownloadsLoading);
+        if (recentDownloadsLoading) {
+          utils.hide(recentDownloadsLoading);
+        }
+        
         this.renderRecentDownloads(recentBooks);
       } catch (e) {
         console.error('Error fetching recent downloads:', e);
-        utils.hide(el.recentDownloadsLoading);
-        utils.show(el.noRecentDownloads);
+        const recentDownloadsLoading = el.recentDownloadsLoading || document.getElementById('recent-downloads-loading');
+        if (recentDownloadsLoading) {
+          utils.hide(recentDownloadsLoading);
+        }
+        const noRecentDownloads = el.noRecentDownloads || document.getElementById('no-recent-downloads');
+        if (noRecentDownloads) {
+          utils.show(noRecentDownloads);
+        }
       }
+      */
     },
     
     renderRecentDownloads(books) {
-      el.recentDownloadsGrid.innerHTML = '';
-      if (!books || books.length === 0) {
-        utils.show(el.noRecentDownloads);
+      // Fonctionnalité désactivée - les "recent downloads" ne sont plus utilisées
+      console.log('Recent downloads feature is disabled - renderRecentDownloads skipped');
+      return;
+      
+      // Ancien code conservé pour référence si la fonctionnalité doit être réactivée
+      /*
+      // Vérifier que nous sommes sur la page d'accueil
+      const currentPage = typeof navigation !== 'undefined' ? navigation.currentPage : 'unknown';
+      if (currentPage !== 'home') {
+        console.log('Not on home page, skipping renderRecentDownloads');
         return;
       }
-      utils.hide(el.noRecentDownloads);
+      
+      // Vérifier que les éléments existent avant de les manipuler
+      const recentDownloadsGrid = el.recentDownloadsGrid || document.getElementById('recent-downloads-grid');
+      if (!recentDownloadsGrid) {
+        console.warn('Recent downloads grid element not found - feature might be disabled');
+        return;
+      }
+      
+      const noRecentDownloads = el.noRecentDownloads || document.getElementById('no-recent-downloads');
+      
+      recentDownloadsGrid.innerHTML = '';
+      if (!books || books.length === 0) {
+        if (noRecentDownloads) {
+          utils.show(noRecentDownloads);
+        }
+        return;
+      }
+      
+      if (noRecentDownloads) {
+        utils.hide(noRecentDownloads);
+      }
       
       const frag = document.createDocumentFragment();
       books.forEach((book) => {
         const card = this.createMiniCard(book);
         frag.appendChild(card);
       });
-      el.recentDownloadsGrid.appendChild(frag);
+      recentDownloadsGrid.appendChild(frag);
+      */
     },
     
     async fetchPopularBooks(forceRefresh = false) {
       try {
         console.log('Fetching popular books...');
         
-        // S'assurer que les éléments existent
+        // Vérifier d'abord si nous sommes sur la page appropriée
+        const currentPage = typeof navigation !== 'undefined' ? navigation.currentPage : 'unknown';
+        if (currentPage !== 'popular' && currentPage !== 'home') {
+          console.log('Not on popular or home page, skipping fetchPopularBooks');
+          return;
+        }
+        
+        // S'assurer que les éléments existent avec vérification robuste
         const container = document.getElementById('popular-books-container');
         const loading = document.getElementById('popular-books-loading');
         const noBooks = document.getElementById('no-popular-books');
         
-        if (!container || !loading) {
-          console.error('Popular books container or loading element not found');
+        if (!container) {
+          console.warn('Popular books container not found - might be expected if not on popular page');
           return;
+        }
+        
+        if (!loading) {
+          console.warn('Popular books loading element not found - proceeding without loading indicator');
         }
         
         // Vérifier le cache en premier (sauf si rafraîchissement forcé)
@@ -4749,11 +4980,18 @@
     },
     
     renderPopularBooks(books, fromExpiredCache = false) {
+      // Vérifier si nous sommes sur une page appropriée
+      const currentPage = typeof navigation !== 'undefined' ? navigation.currentPage : 'unknown';
+      if (currentPage !== 'popular' && currentPage !== 'home') {
+        console.log('Not on popular or home page, skipping renderPopularBooks');
+        return;
+      }
+      
       const container = document.getElementById('popular-books-container');
       const noBooks = document.getElementById('no-popular-books');
       
       if (!container) {
-        console.error('Popular books container not found');
+        console.warn('Popular books container not found - might be expected if not on popular page');
         return;
       }
       
@@ -4889,18 +5127,36 @@
     init() {
       console.log('=== HOME SECTIONS INIT CALLED ===');
       
-      // Bind refresh buttons
-      el.refreshRecentBtn?.addEventListener('click', () => this.fetchRecentDownloads());
-      el.refreshPopularBtn?.addEventListener('click', () => this.fetchPopularBooks());
+      // Vérifier si nous sommes sur la page d'accueil avant d'initialiser
+      const currentPage = typeof navigation !== 'undefined' ? navigation.currentPage : 'unknown';
+      if (currentPage !== 'home') {
+        console.log('Not on home page, skipping homeSections initialization');
+        return;
+      }
+      
+      // La fonctionnalité "recent downloads" est désactivée car non utilisée
+      console.log('Recent downloads feature is disabled - not initializing');
+      
+      // Bind refresh buttons seulement si les éléments existent
+      const refreshPopularBtn = el.refreshPopularBtn || document.getElementById('refresh-popular');
+      if (refreshPopularBtn) {
+        refreshPopularBtn.addEventListener('click', () => this.fetchPopularBooks());
+      } else {
+        console.warn('Refresh popular button not found');
+      }
       
       // Utiliser le viewManager pour initialiser les boutons de vue popular
       if (typeof viewManager !== 'undefined') {
         viewManager.initPopularViewToggle();
       }
       
-      // Charger les données initiales
-      this.fetchRecentDownloads();
-      this.fetchPopularBooks();
+      // Charger uniquement les données des livres populaires
+      const popularBooksContainer = el.popularBooksContainer || document.getElementById('popular-books-container');
+      if (popularBooksContainer) {
+        this.fetchPopularBooks();
+      } else {
+        console.log('Popular books container not found, skipping fetchPopularBooks');
+      }
     },
     
     
