@@ -1,7 +1,7 @@
 <!-- Hero / Search -->
 <section class="mb-6">
-    <div class="flex flex-col gap-3">
-        <div class="flex gap-2">
+    <div class="search-container">
+        <div class="search-basic">
             <input id="search-input" type="search" placeholder="Search by ISBN, title, author..." aria-label="Search books"
                    class="flex-1 px-4 py-3 rounded-md border outline-none"
                    style="background: var(--bg-soft); color: var(--text); border-color: var(--border-muted);">
@@ -9,11 +9,9 @@
                 Search
             </button>
         </div>
-        <div>
-            <button id="toggle-advanced" class="text-sm underline opacity-80 hover:opacity-100">Advanced Search</button>
-        </div>
         <!-- Advanced Filters -->
-        <form id="search-filters" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 hidden">
+        <div class="search-filters-container">
+            <form id="search-filters" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
                 <label for="isbn-input" class="block text-sm mb-1 opacity-80">ISBN</label>
                 <input id="isbn-input" type="search" placeholder="ISBN"
@@ -110,11 +108,8 @@
                     </label>
                 </div>
             </div>
-            <div class="md:col-span-2 lg:col-span-3 flex justify-end">
-                <button id="adv-search-button" type="button" class="px-4 py-2 rounded-md border"
-                        style="border-color: var(--border-muted);">Search</button>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </section>
 
@@ -128,7 +123,7 @@
 </section>
 
 <!-- Results -->
-<section class="mb-8" id="search-section">
+<section class="mb-8 hidden" id="search-section">
     <div class="flex items-center justify-between mb-3">
         <h2 class="text-xl font-semibold">Search Results</h2>
         <div class="flex items-center gap-3">

@@ -646,13 +646,27 @@
       el.viewGridBtn = document.getElementById('view-grid');
       el.viewListBtn = document.getElementById('view-list');
       
+      // Mettre également à jour les éléments de formulaire de recherche
+      el.searchInput = document.getElementById('search-input');
+      el.searchBtn = document.getElementById('search-button');
+      el.filtersForm = document.getElementById('search-filters');
+      el.isbn = document.getElementById('isbn-input');
+      el.author = document.getElementById('author-input');
+      el.title = document.getElementById('title-input');
+      el.lang = document.getElementById('lang-input');
+      el.sort = document.getElementById('sort-input');
+      el.content = document.getElementById('content-input');
+      
       const elements = {
         resultsContainer: el.resultsContainer,
         noResults: el.noResults,
         searchLoading: el.searchLoading,
         viewToggleContainer: el.viewToggleContainer,
         viewGridBtn: el.viewGridBtn,
-        viewListBtn: el.viewListBtn
+        viewListBtn: el.viewListBtn,
+        searchInput: el.searchInput,
+        searchBtn: el.searchBtn,
+        filtersForm: el.filtersForm
       };
       
       console.log('Search elements refreshed:', {
@@ -661,7 +675,10 @@
         searchLoading: !!el.searchLoading,
         viewToggleContainer: !!el.viewToggleContainer,
         viewGridBtn: !!el.viewGridBtn,
-        viewListBtn: !!el.viewListBtn
+        viewListBtn: !!el.viewListBtn,
+        searchInput: !!el.searchInput,
+        searchBtn: !!el.searchBtn,
+        filtersForm: !!el.filtersForm
       });
       
       return elements;
@@ -673,69 +690,64 @@
         // Mettre à jour les références aux éléments de recherche
         this.refreshSearchElements();
         
+        // Réinitialiser l'état de recherche au chargement de la page
+        searchState.reset();
+        
         // Re-bind search events avec une vérification d'existence
         const searchBtn = document.getElementById('search-button');
         const searchInput = document.getElementById('search-input');
-        const advToggle = document.getElementById('toggle-advanced');
         const advSearchBtn = document.getElementById('adv-search-button');
         
         console.log('Initializing search page, elements found:', {
           searchBtn: !!searchBtn,
           searchInput: !!searchInput,
-          advToggle: !!advToggle,
           advSearchBtn: !!advSearchBtn
         });
         
         // Toujours lier les événements, même si l'objet search n'est pas encore disponible
         if (searchBtn) {
-          // Supprimer les anciens gestionnaires d'événements pour éviter les doublons
-          searchBtn.replaceWith(searchBtn.cloneNode(true));
-          const newSearchBtn = document.getElementById('search-button');
-          newSearchBtn.addEventListener('click', (e) => {
+          // Utiliser une approche plus simple et fiable pour lier les événements
+          // Supprimer tous les gestionnaires d'événements existants
+          searchBtn.removeEventListener('click', this.searchButtonHandler);
+          // Créer et attacher le nouveau gestionnaire
+          this.searchButtonHandler = (e) => {
             e.preventDefault();
             console.log('Search button clicked');
             this.performSearch();
-          });
+          };
+          searchBtn.addEventListener('click', this.searchButtonHandler);
         }
         
         if (searchInput) {
-          // Supprimer les anciens gestionnaires d'événements pour éviter les doublons
-          const newSearchInput = searchInput.cloneNode(true);
-          searchInput.parentNode.replaceChild(newSearchInput, searchInput);
-          newSearchInput.addEventListener('keydown', (e) => {
+          // Utiliser une approche plus simple et fiable pour lier les événements
+          // Supprimer tous les gestionnaires d'événements existants
+          searchInput.removeEventListener('keydown', this.searchInputHandler);
+          // Créer et attacher le nouveau gestionnaire
+          this.searchInputHandler = (e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
               console.log('Enter key pressed in search input');
               this.performSearch();
             }
-          });
+          };
+          searchInput.addEventListener('keydown', this.searchInputHandler);
         }
         
-        // Bind advanced search toggle
-        if (advToggle) {
-          // Supprimer les anciens gestionnaires d'événements pour éviter les doublons
-          advToggle.replaceWith(advToggle.cloneNode(true));
-          const newAdvToggle = document.getElementById('toggle-advanced');
-          newAdvToggle.addEventListener('click', (e) => {
-            e.preventDefault();
-            const filtersForm = document.getElementById('search-filters');
-            if (filtersForm) {
-              filtersForm.classList.toggle('hidden');
-              console.log('Advanced search toggled');
-            }
-          });
-        }
+        // Advanced search toggle removed - filters are always visible
+        console.log('Advanced search toggle removed - filters are always visible');
         
         // Bind advanced search button
         if (advSearchBtn) {
-          // Supprimer les anciens gestionnaires d'événements pour éviter les doublons
-          advSearchBtn.replaceWith(advSearchBtn.cloneNode(true));
-          const newAdvSearchBtn = document.getElementById('adv-search-button');
-          newAdvSearchBtn.addEventListener('click', (e) => {
+          // Utiliser une approche plus simple et fiable pour lier les événements
+          // Supprimer tous les gestionnaires d'événements existants
+          advSearchBtn.removeEventListener('click', this.advSearchButtonHandler);
+          // Créer et attacher le nouveau gestionnaire
+          this.advSearchButtonHandler = (e) => {
             e.preventDefault();
             console.log('Advanced search button clicked');
             this.performSearch();
-          });
+          };
+          advSearchBtn.addEventListener('click', this.advSearchButtonHandler);
         }
         
         // Initialize view toggle for search results
@@ -751,7 +763,7 @@
         } else {
           console.error('View manager not available');
         }
-      }, 100); // Délai pour s'assurer que le DOM est prêt
+      }, 200); // Augmenté le délai pour s'assurer que le DOM est prêt
     },
     
     performSearch() {
@@ -790,6 +802,8 @@
           if (typeof viewManager !== 'undefined') {
             viewManager.renderResults([]);
           }
+          // Réinitialiser l'état de recherche si la requête est vide
+          searchState.reset();
           return;
         }
         
@@ -801,7 +815,7 @@
         }
         
         // Vérifier les éléments de résultats
-        const resultsContainer = document.getElementById('results-container');
+        let resultsContainer = document.getElementById('results-container');
         const noResults = document.getElementById('no-results');
         console.log('Results container available:', !!resultsContainer);
         console.log('No results element available:', !!noResults);
@@ -883,7 +897,7 @@
             console.log('Hiding loading indicator');
           }
         });
-      }, 100); // Délai de 100ms pour s'assurer que le DOM est prêt
+      }, 200); // Augmenté le délai pour s'assurer que le DOM est prêt
     },
     
     initializePopularPage() {
@@ -1348,7 +1362,7 @@
   const el = {
     searchInput: document.getElementById('search-input'),
     searchBtn: document.getElementById('search-button'),
-    advToggle: document.getElementById('toggle-advanced'),
+    // advToggle removed - advanced search is always visible
     filtersForm: document.getElementById('search-filters'),
     isbn: document.getElementById('isbn-input'),
     author: document.getElementById('author-input'),
@@ -1423,6 +1437,38 @@
   const VIEW_MODES = {
     GRID: 'grid',
     LIST: 'list'
+  };
+  
+  // ---- Search State ----
+  const searchState = {
+    hasSearched: false,
+    
+    reset() {
+      this.hasSearched = false;
+      this.hideSearchSection();
+    },
+    
+    markSearched() {
+      this.hasSearched = true;
+      this.showSearchSection();
+    },
+    
+    hideSearchSection() {
+      const searchSection = document.getElementById('search-section');
+      if (searchSection) {
+        searchSection.classList.add('hidden');
+      }
+    },
+    
+    showSearchSection() {
+      const searchSection = document.getElementById('search-section');
+      if (searchSection) {
+        searchSection.classList.remove('hidden');
+        console.log('Search section shown');
+      } else {
+        console.warn('Search section element not found');
+      }
+    }
   };
   
   // ---- API Cache ----
@@ -1574,10 +1620,8 @@
       
       // Utiliser des références dynamiques pour éviter les erreurs
       const searchInput = el.searchInput || document.getElementById('search-input');
-      const filtersForm = el.filtersForm || document.getElementById('search-filters');
       
       console.log('searchInput:', searchInput);
-      console.log('filtersForm:', filtersForm);
       
       const q = [];
       const basic = searchInput?.value?.trim();
@@ -1588,8 +1632,10 @@
         console.log('Added basic query:', `query=${encodeURIComponent(basic)}`);
       }
 
-      if (!filtersForm || filtersForm.classList.contains('hidden')) {
-        console.log('Filters form is hidden or not available, returning basic query');
+      // Les filtres sont maintenant toujours visibles, plus besoin de vérifier s'ils sont masqués
+      const filtersContainer = document.getElementById('search-filters');
+      if (!filtersContainer) {
+        console.log('Filters container not available, returning basic query');
         return q.join('&');
       }
 
@@ -1603,16 +1649,17 @@
             console.log('Added format filter:', `format=${encodeURIComponent(cb.value)}`);
           });
         } else {
-          const input = document.querySelectorAll(`[id^="${name}-input"]`);
-          console.log(`Filter inputs for ${name}:`, input);
-          input.forEach((node) => {
-            const val = node.value?.trim();
+          // Utiliser des sélecteurs plus spécifiques pour éviter les conflits
+          const input = document.getElementById(`${name}-input`);
+          console.log(`Filter input for ${name}:`, input);
+          if (input) {
+            const val = input.value?.trim();
             console.log(`Value for ${name}:`, val);
             if (val) {
               q.push(`${name}=${encodeURIComponent(val)}`);
               console.log('Added filter:', `${name}=${encodeURIComponent(val)}`);
             }
-          });
+          }
         }
       });
 
@@ -2980,12 +3027,19 @@
       return new Promise((resolve, reject) => {
         setTimeout(async () => {
           try {
+            // S'assurer que les éléments de recherche sont à jour
+            if (typeof navigation !== 'undefined' && navigation.refreshSearchElements) {
+              navigation.refreshSearchElements();
+            }
+            
             const qs = utils.buildQuery();
             console.log('Query string from buildQuery:', qs);
             
             if (!qs) {
               console.log('Empty query string in search.run()');
               window.lastSearchResults = [];
+              // Réinitialiser l'état de recherche si la requête est vide
+              searchState.reset();
               if (typeof viewManager !== 'undefined') {
                 viewManager.renderResults([]);
               } else {
@@ -2995,9 +3049,17 @@
               return;
             }
             
+            // Marquer que nous avons effectué une recherche
+            searchState.markSearched();
+            
             // Afficher le chargement
-            if (el.searchLoading) {
-              utils.show(el.searchLoading);
+            let searchLoading = el.searchLoading;
+            if (!searchLoading) {
+              searchLoading = document.getElementById('search-loading');
+            }
+            
+            if (searchLoading) {
+              utils.show(searchLoading);
               console.log('Showing search loading indicator');
             } else {
               console.warn('searchLoading element not found');
@@ -3009,16 +3071,8 @@
             // Afficher un message de débogage dans le conteneur de résultats
             let resultsContainer = el.resultsContainer;
             if (!resultsContainer) {
-              // Essayer de rafraîchir les éléments si el.resultsContainer est null
-              if (typeof navigation !== 'undefined' && navigation.refreshSearchElements) {
-                navigation.refreshSearchElements();
-                resultsContainer = el.resultsContainer;
-              }
-              
-              // Si toujours null, essayer de récupérer directement
-              if (!resultsContainer) {
-                resultsContainer = document.getElementById('results-container');
-              }
+              // Essayer de récupérer directement
+              resultsContainer = document.getElementById('results-container');
             }
             
             if (resultsContainer) {
@@ -3056,16 +3110,7 @@
             // Afficher un message d'erreur détaillé
             let resultsContainer = el.resultsContainer;
             if (!resultsContainer) {
-              // Essayer de rafraîchir les éléments si el.resultsContainer est null
-              if (typeof navigation !== 'undefined' && navigation.refreshSearchElements) {
-                navigation.refreshSearchElements();
-                resultsContainer = el.resultsContainer;
-              }
-              
-              // Si toujours null, essayer de récupérer directement
-              if (!resultsContainer) {
-                resultsContainer = document.getElementById('results-container');
-              }
+              resultsContainer = document.getElementById('results-container');
             }
             
             if (resultsContainer) {
@@ -3093,12 +3138,17 @@
             reject(e);
           } finally {
             // Cacher le chargement
-            if (el.searchLoading) {
-              utils.hide(el.searchLoading);
+            let searchLoading = el.searchLoading;
+            if (!searchLoading) {
+              searchLoading = document.getElementById('search-loading');
+            }
+            
+            if (searchLoading) {
+              utils.hide(searchLoading);
               console.log('Hiding search loading indicator');
             }
           }
-        }, 100); // Délai de 100ms pour s'assurer que le DOM est prêt
+        }, 200); // Augmenté le délai pour s'assurer que le DOM est prêt
       });
     }
   };
@@ -4116,16 +4166,48 @@
 
   // ---- Wire up ----
   function initEvents() {
-    el.searchBtn?.addEventListener('click', () => search.run());
-    el.searchInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') search.run(); });
-    document.getElementById('adv-search-button')?.addEventListener('click', () => search.run());
-
-    if (el.advToggle && el.filtersForm) {
-      el.advToggle.addEventListener('click', (e) => {
-        e.preventDefault();
-        el.filtersForm.classList.toggle('hidden');
+    // Utiliser des références dynamiques pour les éléments de recherche
+    const searchBtn = el.searchBtn || document.getElementById('search-button');
+    const searchInput = el.searchInput || document.getElementById('search-input');
+    const advSearchBtn = document.getElementById('adv-search-button');
+    
+    if (searchBtn) {
+      searchBtn.addEventListener('click', () => {
+        console.log('Search button clicked from initEvents');
+        if (typeof search !== 'undefined' && search.run) {
+          search.run();
+        } else if (typeof navigation !== 'undefined' && navigation.performSearch) {
+          navigation.performSearch();
+        }
       });
     }
+    
+    if (searchInput) {
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          console.log('Enter key pressed from initEvents');
+          if (typeof search !== 'undefined' && search.run) {
+            search.run();
+          } else if (typeof navigation !== 'undefined' && navigation.performSearch) {
+            navigation.performSearch();
+          }
+        }
+      });
+    }
+    
+    if (advSearchBtn) {
+      advSearchBtn.addEventListener('click', () => {
+        console.log('Advanced search button clicked from initEvents');
+        if (typeof search !== 'undefined' && search.run) {
+          search.run();
+        } else if (typeof navigation !== 'undefined' && navigation.performSearch) {
+          navigation.performSearch();
+        }
+      });
+    }
+
+    // Advanced search toggle removed - filters are always visible
+    console.log('Advanced search toggle logic removed - filters are always visible');
 
     el.refreshStatusBtn?.addEventListener('click', () => {
       // Feedback immédiat

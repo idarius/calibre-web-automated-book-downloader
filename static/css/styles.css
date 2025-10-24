@@ -438,7 +438,29 @@ header:not(:hover)::before {
     max-width: 600px;
     margin: 0 auto;
     display: flex;
+    flex-direction: column;
     gap: 0.5rem;
+    /* Hauteur fixe pour maintenir une taille constante */
+    min-height: 200px;
+    /* Hauteur maximale pour éviter que le conteneur ne devienne trop grand */
+    max-height: 400px;
+    /* Assurer que le conteneur ne rétrécit pas lorsque les filtres sont masqués */
+    height: auto;
+    overflow: hidden;
+}
+
+/* Conteneur pour les éléments de recherche de base */
+.search-basic {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Conteneur pour les filtres de recherche avancée - toujours visible */
+.search-filters-container {
+    /* Hauteur fixe pour les filtres avancés */
+    min-height: 140px;
+    overflow: visible;
 }
 
 .search-container input {
