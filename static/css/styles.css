@@ -2476,3 +2476,12 @@ button:disabled {
         text-align: center;
     }
 }
+
+/* Correction pour l'affichage mobile des champs de recherche */
+@media (max-width: 768px) {
+    .search-container {
+        max-height: none; /* Supprimer la limite de hauteur */
+        min-height: auto; /* Permettre au conteneur de s'adapter */
+        overflow: visible; /* Assurer que tout le contenu est visible */
+    }
+}

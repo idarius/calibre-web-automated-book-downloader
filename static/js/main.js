@@ -17,7 +17,7 @@
     
     setupMobileMenu() {
       const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-      const mobileOverlay = document.getElementById('mobile-overlay');
+      const sidebarOverlay = document.getElementById('sidebar-overlay');
       const sidebar = document.getElementById('sidebar');
       
       if (mobileMenuBtn) {
@@ -26,8 +26,8 @@
         });
       }
       
-      if (mobileOverlay) {
-        mobileOverlay.addEventListener('click', () => {
+      if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', () => {
           this.closeMobileMenu();
         });
       }
@@ -121,21 +121,21 @@
     
     openMobileMenu() {
       const sidebar = document.getElementById('sidebar');
-      const overlay = document.getElementById('mobile-overlay');
+      const overlay = document.getElementById('sidebar-overlay');
       
       if (sidebar && overlay) {
         sidebar.classList.add('mobile-open');
         overlay.classList.add('active');
         this.isMobileMenuOpen = true;
         
-        // Prevent body scroll
-        document.body.style.overflow = 'hidden';
+        // Garder la scrollbar visible pour éviter le décalage
+        document.body.style.overflow = 'auto';
       }
     },
     
     closeMobileMenu() {
       const sidebar = document.getElementById('sidebar');
-      const overlay = document.getElementById('mobile-overlay');
+      const overlay = document.getElementById('sidebar-overlay');
       
       if (sidebar && overlay) {
         sidebar.classList.remove('mobile-open');
